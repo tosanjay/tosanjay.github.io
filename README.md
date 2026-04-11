@@ -1,2 +1,1 @@
-# tosanjay.github.io
-Sanjay's Github Home
+# Sanjay's Github Home
