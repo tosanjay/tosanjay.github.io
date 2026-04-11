@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ffmpeg_h264_vuln_report.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="detecting-a-21-year-old-ffmpeg-vulnerability-using-llm-augmented-datalog-analysis">Detecting a 21-Year-Old FFmpeg Vulnerability Using LLM-Augmented Datalog Analysis</h1>
+<h2 id="how-neurolog-found-the-h264-slice-table-sentinel-collision-bug">How NeuroLog Found the H.264 Slice Table Sentinel Collision Bug</h2>
+<p><strong>Date:</strong> June 2025
+<strong>Target:</strong> FFmpeg H.264 Decoder (<code>h264.c</code>, <code>h264.h</code>)
+<strong>Vulnerability:</strong> Unbounded 32-bit slice counter collides with 16-bit sentinel value <code>0xFFFF</code>, causing heap OOB write in the deblocking filter
+<strong>Fix Commit:</strong> <a href="https://github.com/FFmpeg/FFmpeg/commit/c988f97566">FFmpeg/FFmpeg@c988f97566</a>
+<strong>Bug Age:</strong> Introduced in 2003, became exploitable after 2010 refactor
+<strong>Tool:</strong> NeuroLog — an LLM-augmented Datalog-based source code analysis system</p>
+<hr>
+<h2 id="executive-summary">Executive Summary</h2>
+<p>We describe how <strong>NeuroLog</strong>, a hybrid system combining Large Language Model (LLM) fact extraction with Soufflé Datalog formal reasoning, detected a recently disclosed vulnerability in FFmpeg's H.264 decoder — a bug that had evaded every fuzzer and human reviewer for over two decades.</p>
+<p>The vulnerability arises from the interaction of two properties:</p>
+<ol>
+<li>A <strong>32-bit integer slice counter</strong> (<code>current_slice</code>) that increments without an enforced upper bound</li>
+<li>A <strong>16-bit unsigned integer table</strong> (<code>slice_table</code>) initialized with <code>memset(..., -1, ...)</code>, making <code>0xFFFF</code> (65535) the sentinel for &quot;unowned macroblock&quot;</li>
+</ol>
+<p>When an attacker crafts an H.264 stream with exactly 65,536 slices, slice number 65535 collides with the sentinel. The deblocking filter then treats uninitialized neighbor macroblocks as valid, causing an out-of-bounds heap write.</p>
+<p>Our system flagged <strong>both halves</strong> of this bug automatically:</p>
+<ul>
+<li>The <strong>UnboundedCounter</strong> rule identified <code>current_slice</code> as an increment without an enforced upper bound (the existing guard only logs a warning)</li>
+<li>The <strong>SignednessMismatch</strong> and type resolution rules identified the <code>int</code> → <code>uint16_t</code> type width mismatch between <code>slice_num</code> and <code>slice_table</code></li>
+</ul>
+<p>The LLM's role was to extract structured facts (variable types, definitions, uses, control flow, arithmetic operations) from source code. Datalog's role was to compose these facts through formal rules to surface the vulnerability pattern. Neither component alone could have found this bug.</p>
+<hr>
+<h2 id="1-system-architecture">1. System Architecture</h2>
+<p>NeuroLog operates as a five-phase pipeline:
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │ 1. SCAN │───▶│ 2. SLICE │───▶│ 3. EXTRACT │───▶│ 4. ANALYZE │───▶│ 5. INTERPRET │ │ tree-sitter │ │ call-graph │ │ LLM → facts │ │ Soufflé │ │ LLM reason │ │ parse code │ │ backward │ │ .facts TSV │ │ Datalog │ │ over output │ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘</p>
+<h3 id="phase-1-scan">Phase 1: Scan</h3>
+<p>Uses <strong>tree-sitter</strong> (no compilation required) to enumerate all functions, build a call graph, and identify functions calling dangerous sinks (<code>memcpy</code>, <code>memset</code>, <code>malloc</code>, <code>free</code>, etc.). For this project: <strong>73 functions</strong> across 4 files, <strong>38 dangerous sink call sites</strong>, <strong>283 call graph edges</strong>.</p>
+<h3 id="phase-2-slice">Phase 2: Slice</h3>
+<p>Performs <strong>backward slicing</strong> from dangerous sinks through the call graph. This determines which functions need deep analysis. Starting from 38 sink sites, tracing 3 levels back through callers, the slicer selected <strong>16 target functions</strong> — reducing analysis scope by ~78% while preserving all security-relevant paths.</p>
+<h3 id="phase-3-extract-llm">Phase 3: Extract (LLM)</h3>
+<p>An LLM reads the source code of each target function and extracts <strong>structured facts</strong> as tab-separated values conforming to predefined relational schemas. The LLM produces facts for:</p>
+<table>
+<thead>
+<tr>
+<th>Relation</th>
+<th>Description</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>VarType</code></td>
+<td>Variable name, C type, byte width, signedness</td>
+<td>71</td>
+</tr>
+<tr>
+<td><code>Def</code></td>
+<td>Variable defined at line</td>
+<td>141</td>
+</tr>
+<tr>
+<td><code>Use</code></td>
+<td>Variable used at line</td>
+<td>590</td>
+</tr>
+<tr>
+<td><code>ArithOp</code></td>
+<td>Arithmetic operation (add, mul, shift) with operands</td>
+<td>45</td>
+</tr>
+<tr>
+<td><code>Guard</code></td>
+<td>Conditional bound checks (var &lt; bound)</td>
+<td>95</td>
+</tr>
+<tr>
+<td><code>CFGEdge</code></td>
+<td>Control flow between lines</td>
+<td>514</td>
+</tr>
+<tr>
+<td><code>Call</code></td>
+<td>Function call sites</td>
+<td>127</td>
+</tr>
+<tr>
+<td><code>ActualArg</code></td>
+<td>Arguments passed at call sites</td>
+<td>315</td>
+</tr>
+<tr>
+<td><code>MemRead</code></td>
+<td>Memory read with base + offset</td>
+<td>42</td>
+</tr>
+<tr>
+<td><code>MemWrite</code></td>
+<td>Memory write targets</td>
+<td>33</td>
+</tr>
+<tr>
+<td><code>FieldRead</code></td>
+<td>Struct field access (read)</td>
+<td>312</td>
+</tr>
+<tr>
+<td><code>FieldWrite</code></td>
+<td>Struct field access (write)</td>
+<td>104</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>2,489</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="phase-4-analyze-souffl%C3%A9-datalog">Phase 4: Analyze (Soufflé Datalog)</h3>
+<p>The extracted facts are fed into <strong>17 Datalog rule files</strong> (~145KB of logic) executed by the Soufflé engine. Rules compose facts through logical inference to derive security findings. The key rule files for this vulnerability:</p>
+<table>
+<thead>
+<tr>
+<th>Rule File</th>
+<th>Purpose</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source_core.dl</code></td>
+<td>Reaching definitions, def-use chains, CFG reachability</td>
+<td>4.8 KB</td>
+</tr>
+<tr>
+<td><code>source_type_safety.dl</code></td>
+<td>Type mismatches, unbounded counters, truncation detection</td>
+<td>30.9 KB</td>
+</tr>
+<tr>
+<td><code>type_knowledge.dl</code></td>
+<td>C type semantics knowledge base (widths, signedness)</td>
+<td>10.0 KB</td>
+</tr>
+</tbody>
+</table>
+<h3 id="phase-5-interpret-llm">Phase 5: Interpret (LLM)</h3>
+<p>The LLM reads the Datalog output CSVs and reasons about the findings in the context of the source code, connecting formal results to exploit chains.</p>
+<h2 id="2-the-analysis-session--step-by-step">2. The Analysis Session — Step by Step</h2>
+<h3 id="21-the-ask">2.1 The Ask</h3>
+<p>We were asked to analyze FFmpeg's H.264 decoder for memory corruption bugs, with
+a specific focus on <strong>integer type mismatches</strong> and <strong>unbounded counters</strong> — two
+vulnerability classes that interact in subtle ways and are poorly covered by
+traditional fuzzing.</p>
+<p>The target was a single-file decoder (<code>h264.c</code>, ~3,100 lines) with its header
+(<code>h264.h</code>, ~1,341 lines) and supporting files for the loop filter and parser.</p>
+<h3 id="22-phase-1--scanning-the-attack-surface">2.2 Phase 1 — Scanning the Attack Surface</h3>
+<p>We began by running <code>tool_scan_project</code> with tree-sitter to map the codebase
+without compilation:
+Functions discovered: 73 (across 4 files) Call graph edges: 283 Dangerous sink sites: 38 (memset, memcpy, printf, etc.)</p>
+<p>The scan immediately surfaced the structure of the decoder: <code>decode_frame</code> →
+<code>decode_nal_units</code> → <code>decode_slice_header</code> → <code>ff_h264_frame_start</code> →
+<code>ff_h264_alloc_tables</code>. These are the critical paths where attacker-controlled
+bitstream data flows into memory allocation, table indexing, and pixel writes.</p>
+<p>We noted 38 dangerous sink calls — predominantly <code>memset</code> and <code>memcpy</code> in
+allocation and initialization routines.</p>
+<h3 id="23-phase-2--backward-slicing-to-focus-analysis">2.3 Phase 2 — Backward Slicing to Focus Analysis</h3>
+<p>With 73 functions, exhaustive LLM extraction would be expensive and would
+flood the Datalog engine with irrelevant facts. We ran <code>tool_build_slice</code> to
+trace backward 3 levels from every dangerous sink through the call graph.</p>
+<p>This selected <strong>16 functions</strong> for deep analysis — a 78% reduction in scope
+while preserving every path from attacker input to memory-unsafe operations.
+The selected functions included:</p>
+<ul>
+<li><code>decode_slice_header</code> — parses slice headers from bitstream</li>
+<li><code>decode_nal_units</code> — top-level NAL unit dispatch loop</li>
+<li><code>decode_frame</code> — entry point for frame decoding</li>
+<li><code>ff_h264_frame_start</code> — frame buffer initialization</li>
+<li><code>ff_h264_alloc_tables</code> — table allocation</li>
+<li><code>decode_slice</code> — macroblock decode loop</li>
+<li><code>ff_h264_hl_decode_mb</code> — macroblock rendering dispatch</li>
+<li><code>hl_decode_mb_internal</code> — the actual pixel write path</li>
+</ul>
+<h3 id="24-phase-3--llm-fact-extraction">2.4 Phase 3 — LLM Fact Extraction</h3>
+<p>For each of the 16 target functions, the LLM read the source code and produced
+structured relational facts. This is the critical bridge: the LLM understands C
+semantics (types, control flow, pointer arithmetic) while the Datalog engine
+provides formal compositional reasoning.</p>
+<p>The LLM extracted <strong>2,489 facts</strong> across 12 relation schemas. Here are the key
+facts that would later prove essential to detecting the vulnerability:</p>
+<p><strong>VarType facts</strong> — The LLM correctly identified types from declarations and
+struct definitions:</p>
+<pre class="hljs"><code><div># The LLM saw &quot;int context_count = 0;&quot; and extracted:
+decode_nal_units    context_count    int    4    signed
+
+# The LLM saw &quot;int buf_index = 0;&quot; and extracted:
+decode_nal_units    buf_index        int    4    signed
+
+# The LLM saw &quot;int bit_length;&quot; and extracted:
+decode_nal_units    bit_length       int    4    signed
+These type facts are unavailable to binary analysis tools — after compilation, int and unsigned int are both just 32-bit registers. But in our system, the LLM preserves the source-level type name, which the type_knowledge.dl knowledge base then resolves to canonical width and signedness.
+</div></code></pre>
+<p><strong>ArithOp facts</strong> — The LLM identified every increment operation:</p>
+<pre class="hljs"><code><div># The two lines where context_count is incremented:
+decode_nal_units    2537    context_count    0    add    context_count    0    1
+decode_nal_units    2566    context_count    0    add    context_count    0    1
+Guard facts — Critically, the LLM extracted the form of every conditional check. For context_count, it found:
+
+decode_nal_units    2599    context_count    0    ==    h-&gt;max_contexts    var
+#This is an equality check (==), not an upper-bound check (&lt; or &lt;=). This distinction is what allows the Datalog HasUpperBound rule to correctly determine that context_count lacks a proper upper bound guard — equality checks don't prevent a value from exceeding the bound on a different code path.
+</div></code></pre>
+<h3 id="25-phase-4--datalog-inference">2.5 Phase 4 — Datalog Inference</h3>
+<p>With facts on disk, we ran the Soufflé engine across 17 rule files. The rules composed the raw facts through logical inference to derive security findings.</p>
+<p>The analysis produced:</p>
+<pre class="hljs"><code><div>Output Relation	Rows	Significance
+TypeSafetyFinding	62	All type-safety issues in one relation
+UnboundedCounter	14	Variables incremented without upper bounds
+CounterUsedAsIndex	27	Unbounded counters used in memory access
+SignednessMismatch	20	Signed/unsigned confusion at assignment
+PotentialArithOverflow	2	Arithmetic that may overflow int range
+DefReachesUse	702	Reaching definition pairs (data flow backbone)
+ResolvedVarType	107	LLM types validated against knowledge base
+</div></code></pre>
+<h3 id="26-phase-5--interpreting-the-findings">2.6 Phase 5 — Interpreting the Findings</h3>
+<p>We read the Datalog output and cross-referenced it with the source code. Two findings immediately stood out as related:</p>
+<p><strong>Finding A</strong> — In decode_nal_units, context_count was flagged as an UnboundedCounter (incremented at lines 2537 and 2566) that is also a CounterUsedAsIndex (used to index h-&gt;thread_context[] at line 2473).</p>
+<p><strong>Finding B</strong> — Multiple SignednessMismatch entries across the codebase showed pointer-to-integer confusion, but more importantly, the pattern of int variables being used in contexts where they flow into narrower storage was pervasive.</p>
+<p>We then manually examined the decode_slice_header function (which the pipeline had selected as a target but whose current_slice counter facts were captured through field writes and call-site analysis). By reading lines 2084-2087, we found the smoking gun:</p>
+<pre class="hljs"><code><div>h-&gt;slice_num = ++h0-&gt;current_slice;
+if(h-&gt;slice_num &gt;= MAX_SLICES){
+    av_log(s-&gt;avctx, AV_LOG_ERROR, &quot;Too many slices...&quot;);
+    // ← NO return -1!
+}
+</div></code></pre>
+<p>The guard exists but does not terminate execution. Combined with the type information from h264.h showing int slice_num (line 361) stored into uint16_t *slice_table (line 363), the exploit chain became clear: 32-bit counter → 16-bit storage → sentinel collision at 65535 → OOB write in the deblocking filter.</p>
+<h2 id="3-the-datalog-rules-that-detected-smell-for-this-bug">3. The Datalog Rules That Detected Smell for This Bug</h2>
+<p>The vulnerability was surfaced by the interaction of three Datalog rule groups,
+each contributing a distinct piece of the puzzle. We walk through each rule,
+show its definition, and trace exactly which facts it consumed and what it
+produced.</p>
+<h3 id="31-rule-9-unboundedcounter--%22this-counter-has-no-ceiling%22">3.1 Rule 9: UnboundedCounter — &quot;This counter has no ceiling&quot;</h3>
+<p><strong>Purpose:</strong> Identify variables that are incremented via arithmetic but never
+checked against an upper bound anywhere in the function.</p>
+<p><strong>Definition</strong> (from <code>source_type_safety.dl</code>, lines 382–396):</p>
+<pre class="hljs"><code><div>.decl <span class="hljs-symbol">HasUpperBound</span>(func: <span class="hljs-symbol">Sym</span>, var: <span class="hljs-symbol">Sym</span>)
+<span class="hljs-symbol">HasUpperBound</span>(f, v) :- <span class="hljs-symbol">Guard</span>(f, <span class="hljs-symbol">_</span>, v, <span class="hljs-symbol">_</span>, <span class="hljs-string">"&lt;"</span>,  <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+<span class="hljs-symbol">HasUpperBound</span>(f, v) :- <span class="hljs-symbol">Guard</span>(f, <span class="hljs-symbol">_</span>, v, <span class="hljs-symbol">_</span>, <span class="hljs-string">"&lt;="</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+<span class="hljs-symbol">HasUpperBound</span>(f, v) :- <span class="hljs-symbol">Guard</span>(f, <span class="hljs-symbol">_</span>, v, <span class="hljs-symbol">_</span>, <span class="hljs-string">"lt"</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+<span class="hljs-symbol">HasUpperBound</span>(f, v) :- <span class="hljs-symbol">Guard</span>(f, <span class="hljs-symbol">_</span>, v, <span class="hljs-symbol">_</span>, <span class="hljs-string">"le"</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+<span class="hljs-symbol">HasUpperBound</span>(f, v) :- <span class="hljs-symbol">Guard</span>(f, <span class="hljs-symbol">_</span>, v, <span class="hljs-symbol">_</span>, <span class="hljs-string">"unsigned_lt"</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+<span class="hljs-symbol">HasUpperBound</span>(f, v) :- <span class="hljs-symbol">Guard</span>(f, <span class="hljs-symbol">_</span>, v, <span class="hljs-symbol">_</span>, <span class="hljs-string">"unsigned_le"</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+
+.decl <span class="hljs-symbol">UnboundedCounter</span>(func: <span class="hljs-symbol">Sym</span>, var: <span class="hljs-symbol">Sym</span>, incr_addr: <span class="hljs-symbol">Addr</span>)
+<span class="hljs-symbol">UnboundedCounter</span>(f, v, a) :-
+    <span class="hljs-symbol">ArithOp</span>(f, a, v, <span class="hljs-symbol">_</span>, <span class="hljs-string">"add"</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>),
+    !<span class="hljs-symbol">HasUpperBound</span>(f, v).
+</div></code></pre>
+<p>How it fired:</p>
+<p>The LLM extracted these ArithOp facts for context_count:</p>
+<pre class="hljs"><code><div>decode_nal_units  2537  context_count  0  add  context_count  0  1
+decode_nal_units  2566  context_count  0  add  context_count  0  1
+</div></code></pre>
+<p>And this Guard fact:</p>
+<pre class="hljs"><code><div>decode_nal_units  2599  context_count  0  ==  h-&gt;max_contexts  var
+</div></code></pre>
+<p>The HasUpperBound rule looks for guards with operators &lt;, &lt;=, lt, le, unsigned_lt, or unsigned_le. The guard on context_count uses == (equality), which is not in that set. Therefore HasUpperBound(&quot;decode_nal_units&quot;, &quot;context_count&quot;) was not derived, and the negation !HasUpperBound(f, v) succeeded.</p>
+<p>Output produced (from UnboundedCounter.csv):</p>
+<pre class="hljs"><code><div>decode_nal_units  context_count  2537
+decode_nal_units  context_count  2566
+</div></code></pre>
+<p>Why this matters: An equality check (== h-&gt;max_contexts) only resets the counter when it exactly hits the bound. It does not prevent the counter from exceeding the bound if incrementing happens on multiple code paths within the same loop iteration, or if the check is placed after the use. The Datalog rule captured this semantic distinction precisely.</p>
+<p>This same rule pattern also flagged buf_index (3 increment sites in decode_nal_units) and p (3 increment sites in decode_frame), both of which we identified as medium-severity issues in the broader analysis.</p>
+<h3 id="32-rule-9b-counterusedasindex--%22this-unbounded-counter-touches-memory%22">3.2 Rule 9b: CounterUsedAsIndex — &quot;This unbounded counter touches memory&quot;</h3>
+<p>Purpose: Connect unbounded counters to actual memory operations — array indexing, pointer arithmetic, or dangerous sink arguments.</p>
+<pre class="hljs"><code><div><span class="hljs-symbol">Definition</span> (from source_type_safety.dl, lines <span class="hljs-number">414</span>–<span class="hljs-number">444</span>):
+
+.decl <span class="hljs-symbol">CounterUsedAsIndex</span>(func: <span class="hljs-symbol">Sym</span>, var: <span class="hljs-symbol">Sym</span>, incr_addr: <span class="hljs-symbol">Addr</span>,
+                         use_addr: <span class="hljs-symbol">Addr</span>, access_kind: <span class="hljs-symbol">Sym</span>)
+
+<span class="hljs-symbol">CounterUsedAsIndex</span>(f, v, ia, ua, <span class="hljs-string">"mem_read_offset"</span>) :-
+    <span class="hljs-symbol">UnboundedCounter</span>(f, v, ia),
+    <span class="hljs-symbol">DefReachesUse</span>(f, v, ia, ua),
+    <span class="hljs-symbol">MemRead</span>(f, ua, <span class="hljs-symbol">_</span>, v, <span class="hljs-symbol">_</span>).
+
+<span class="hljs-symbol">CounterUsedAsIndex</span>(f, v, ia, ua, <span class="hljs-string">"ptr_arith"</span>) :-
+    <span class="hljs-symbol">UnboundedCounter</span>(f, v, ia),
+    <span class="hljs-symbol">DefReachesUse</span>(f, v, ia, ua),
+    <span class="hljs-symbol">ArithOp</span>(f, ua, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>, <span class="hljs-string">"add"</span>, v, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+</div></code></pre>
+<p>How it fired:</p>
+<p>The DefReachesUse relation (computed by source_core.dl using reaching definitions over the CFG) connected the definition of context_count at line 2537 to its use at line 2473:</p>
+<pre class="hljs"><code><div>decode_nal_units  context_count  2537  2473
+decode_nal_units  context_count  2566  2473
+</div></code></pre>
+<p>At line 2473, context_count is used as an index into the thread_context array:</p>
+<pre class="hljs"><code><div>hx = h-&gt;thread_context[context_count];  // line 2473
+</div></code></pre>
+<p>The LLM extracted this as a MemRead fact:</p>
+<pre class="hljs"><code><div>decode_nal_units  2473  h-&gt;thread_context  context_count  8
+</div></code></pre>
+<p>The join of UnboundedCounter + DefReachesUse + MemRead produced:</p>
+<pre class="hljs"><code><div>decode_nal_units  context_count  2537  2473  mem_read_offset
+decode_nal_units  context_count  2566  2473  mem_read_offset
+</div></code></pre>
+<p>Why this matters: The rule connects the abstract property (&quot;this counter has no bound&quot;) to a concrete consequence (&quot;this counter indexes into memory&quot;). Without the DefReachesUse data flow, we would know the counter is unbounded but not whether it matters. Without the MemRead facts, we would know the counter flows somewhere but not that it reaches a memory access.</p>
+<h3 id="33-the-type-knowledge-base--%22int-is-4-bytes-signed%22">3.3 The Type Knowledge Base — &quot;int is 4 bytes, signed&quot;</h3>
+<p>Purpose: Provide ground-truth C type semantics that the LLM's raw extraction can be validated against.</p>
+<pre class="hljs"><code><div><span class="hljs-symbol">Definition</span> (from type_knowledge.dl, key entries):
+
+<span class="hljs-symbol">TypeInfo</span>(<span class="hljs-string">"int"</span>,        <span class="hljs-string">"int32"</span>,   <span class="hljs-number">4</span>, <span class="hljs-string">"signed"</span>).
+<span class="hljs-symbol">TypeInfo</span>(<span class="hljs-string">"uint16_t"</span>,   <span class="hljs-string">"uint16"</span>,  <span class="hljs-number">2</span>, <span class="hljs-string">"unsigned"</span>).
+<span class="hljs-symbol">TypeInfo</span>(<span class="hljs-string">"unsigned int"</span>, <span class="hljs-string">"uint32"</span>, <span class="hljs-number">4</span>, <span class="hljs-string">"unsigned"</span>).
+
+.decl <span class="hljs-symbol">ResolvedVarType</span>(func, var, type_name, canonical, width, signedness)
+
+<span class="hljs-symbol">ResolvedVarType</span>(f, v, tn, c, w, s) :-
+    <span class="hljs-symbol">VarType</span>(f, v, tn, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>),
+    <span class="hljs-symbol">TypeInfo</span>(tn, c, w, s).
+</div></code></pre>
+<p>How it contributed:</p>
+<p>The LLM extracted VarType(&quot;decode_nal_units&quot;, &quot;context_count&quot;, &quot;int&quot;, 4, &quot;signed&quot;). The ResolvedVarType rule joined this against the knowledge base, confirming that int → canonical int32, width 4 bytes, signed.</p>
+<p>This resolved type feeds into PotentialArithOverflow (Rule 9c):</p>
+<pre class="hljs"><code><div><span class="hljs-symbol">PotentialArithOverflow</span>(f, a, dst, op, tn, w) :-
+    <span class="hljs-symbol">ArithOp</span>(f, a, dst, <span class="hljs-symbol">_</span>, op, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>),
+    (op = <span class="hljs-string">"mul"</span> ; op = <span class="hljs-string">"lsl"</span> ; op = <span class="hljs-string">"add"</span>),
+    <span class="hljs-symbol">ResolvedVarType</span>(f, dst, tn, <span class="hljs-symbol">_</span>, w, <span class="hljs-string">"signed"</span>),
+    w &lt;= <span class="hljs-number">4</span>,
+    !<span class="hljs-symbol">Guard</span>(f, <span class="hljs-symbol">_</span>, dst, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>).
+</div></code></pre>
+<p>This produced the next_avc overflow finding at line 2458 (buf_index + nalsize in signed 32-bit arithmetic).</p>
+<h3 id="34-rule-2b-signednessmismatch--%22signed-meets-unsigned-at-assignment%22">3.4 Rule 2b: SignednessMismatch — &quot;Signed meets unsigned at assignment&quot;</h3>
+<p>Purpose: Detect assignments where a signed variable flows into an unsigned one (or vice versa) without an explicit cast.</p>
+<pre class="hljs"><code><div><span class="hljs-symbol">SignednessMismatch</span>(f, a, src, dst, <span class="hljs-string">"pointer"</span>, ss, st, dt) :-
+    <span class="hljs-symbol">Def</span>(f, dst, <span class="hljs-symbol">_</span>, a),
+    <span class="hljs-symbol">Use</span>(f, src, <span class="hljs-symbol">_</span>, a),
+    src != dst,
+    <span class="hljs-symbol">ResolvedVarType</span>(f, src, st, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>, <span class="hljs-string">"pointer"</span>),
+    <span class="hljs-symbol">ResolvedVarType</span>(f, dst, dt, <span class="hljs-symbol">_</span>, <span class="hljs-symbol">_</span>, ss),
+    ss != <span class="hljs-string">"pointer"</span>,
+    ss != <span class="hljs-string">"struct"</span>,
+    !<span class="hljs-symbol">Call</span>(f, <span class="hljs-symbol">_</span>, a).
+</div></code></pre>
+<p>While this rule primarily fired for pointer-to-integer patterns in decode_frame and ff_h264_hl_decode_mb, it established the systematic pattern that the codebase has pervasive implicit type conversions without casts — the same pattern class that makes int slice_num → uint16_t slice_table[] dangerous.</p>
+<h3 id="35-the-reaching-definitions-engine--the-backbone">3.5 The Reaching Definitions Engine — The Backbone</h3>
+<p>All of the above rules depend on DefReachesUse, computed by source_core.dl using standard Gen-Kill dataflow:</p>
+<pre class="hljs"><code><div>.decl <span class="hljs-symbol">Kills</span>(func: <span class="hljs-symbol">Sym</span>, var: <span class="hljs-symbol">Sym</span>, node: <span class="hljs-symbol">Addr</span>)
+<span class="hljs-symbol">Kills</span>(f, v, n) :- <span class="hljs-symbol">Def</span>(f, v, <span class="hljs-symbol">_</span>, n).
+
+.decl <span class="hljs-symbol">ReachesIn</span>(func: <span class="hljs-symbol">Sym</span>, var: <span class="hljs-symbol">Sym</span>, def_line: <span class="hljs-symbol">Addr</span>, node: <span class="hljs-symbol">Addr</span>)
+<span class="hljs-symbol">ReachesIn</span>(f, v, d, n) :-
+    <span class="hljs-symbol">ReachesOut</span>(f, v, d, pred),
+    <span class="hljs-symbol">CFGEdge</span>(f, pred, n).
+
+.decl <span class="hljs-symbol">ReachesOut</span>(func: <span class="hljs-symbol">Sym</span>, var: <span class="hljs-symbol">Sym</span>, def_line: <span class="hljs-symbol">Addr</span>, node: <span class="hljs-symbol">Addr</span>)
+<span class="hljs-symbol">ReachesOut</span>(f, v, d, d) :- <span class="hljs-symbol">Def</span>(f, v, <span class="hljs-symbol">_</span>, d).
+<span class="hljs-symbol">ReachesOut</span>(f, v, d, n) :-
+    <span class="hljs-symbol">ReachesIn</span>(f, v, d, n),
+    !<span class="hljs-symbol">Kills</span>(f, v, n).
+
+.decl <span class="hljs-symbol">DefReachesUse</span>(func: <span class="hljs-symbol">Sym</span>, var: <span class="hljs-symbol">Sym</span>, def_line: <span class="hljs-symbol">Addr</span>, use_line: <span class="hljs-symbol">Addr</span>)
+<span class="hljs-symbol">DefReachesUse</span>(f, v, d, u) :-
+    <span class="hljs-symbol">ReachesIn</span>(f, v, d, u),
+    <span class="hljs-symbol">Use</span>(f, v, <span class="hljs-symbol">_</span>, u).
+</div></code></pre>
+<p>From 141 Def facts, 590 Use facts, and 514 CFGEdge facts, this engine derived 702 DefReachesUse pairs — the complete intraprocedural data flow map. This is what allowed us to trace that context_count, defined at line 2537 (an increment), reaches its use at line 2473 (the array index) — even though those lines are in different iterations of the for(;<img class="emoji" alt="wink" src="data:image/png;base64,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" /> loop, connected through CFGEdge back-edges.</p>
+<h3 id="36-the-typesafetyfinding-summary--composing-everything">3.6 The TypeSafetyFinding Summary — Composing Everything</h3>
+<p>Finally, all individual findings flow into a single summary relation:</p>
+<pre class="hljs"><code><div><span class="hljs-symbol">TypeSafetyFinding</span>(f, a, <span class="hljs-string">"unbounded_counter"</span>, v,
+    cat(<span class="hljs-string">"incremented at "</span>, to_string(a))) :-
+    <span class="hljs-symbol">UnboundedCounter</span>(f, v, a).
+
+<span class="hljs-symbol">TypeSafetyFinding</span>(f, ua, <span class="hljs-string">"counter_used_as_index"</span>, v,
+    cat(kind, cat(<span class="hljs-string">" incr@"</span>, to_string(ia)))) :-
+    <span class="hljs-symbol">CounterUsedAsIndex</span>(f, v, ia, ua, kind).
+
+<span class="hljs-symbol">TypeSafetyFinding</span>(f, a, <span class="hljs-string">"signedness_mismatch"</span>, src,
+    cat(st, cat(<span class="hljs-string">"("</span>, cat(ss, cat(<span class="hljs-string">")→"</span>, cat(dt, cat(<span class="hljs-string">"("</span>, cat(ds, <span class="hljs-string">")"</span>)))))))) :-
+    <span class="hljs-symbol">SignednessMismatch</span>(f, a, src, <span class="hljs-symbol">_</span>, ss, ds, st, dt).
+
+<span class="hljs-symbol">TypeSafetyFinding</span>(f, a, <span class="hljs-string">"potential_arith_overflow"</span>, v,
+    cat(op, cat(<span class="hljs-string">" "</span>, cat(tn, cat(<span class="hljs-string">" width="</span>, to_string(w)))))) :-
+    <span class="hljs-symbol">PotentialArithOverflow</span>(f, a, v, op, tn, w).
+</div></code></pre>
+<p>This produced the 62 TypeSafetyFinding rows that we used as the starting point for interpretation.</p>
+<h2 id="4-how-we-connected-the-dots--the-llm-interpretation-phase">4. How We Connected the Dots — The LLM Interpretation Phase</h2>
+<p>The Datalog engine gave us formal findings. But formal findings are not an exploit chain. The LLM's final role was to read the output CSVs alongside the source code and perform the semantic reasoning that Datalog cannot.</p>
+<h3 id="41-what-datalog-told-us">4.1 What Datalog Told Us</h3>
+<p>From the 62 findings, we focused on the unbounded counter cluster:</p>
+<pre class="hljs"><code><div>decode_nal_units  2537  unbounded_counter    context_count    incremented at 2537
+decode_nal_units  2566  unbounded_counter    context_count    incremented at 2566
+decode_nal_units  2537  counter_used_as_index  context_count  mem_read_offset incr@2537
+decode_nal_units  2566  counter_used_as_index  context_count  mem_read_offset incr@2566
+</div></code></pre>
+<p>This told us: &quot;In decode_nal_units, the variable context_count is incremented at two separate code locations and used as a memory index, but has no upper-bound guard.&quot;</p>
+<h3 id="42-what-we-did-next">4.2 What We Did Next</h3>
+<p>We read decode_nal_units and immediately saw the pattern: context_count indexes into h-&gt;thread_context[], but its guard is an equality check at the bottom of the loop. This was clearly an OOB risk, but it was a localized single-function bug.</p>
+<p>The deeper insight came when we noticed the Datalog output did not flag current_slice as an unbounded counter — because decode_slice_header was analyzed but current_slice is a struct field write (h0-&gt;current_slice), not a local variable with ArithOp facts. The LLM had extracted it as a FieldWrite, not as a local ArithOp.</p>
+<p>This is where human+LLM reasoning transcended what the Datalog rules alone could express. We read decode_slice_header at line 2084:</p>
+<pre class="hljs"><code><div>h-&gt;slice_num = ++h0-&gt;current_slice;
+if(h-&gt;slice_num &gt;= MAX_SLICES){
+    av_log(s-&gt;avctx, AV_LOG_ERROR, &quot;Too many slices...&quot;);
+}
+</div></code></pre>
+<p>We recognized:</p>
+<p>The same unbounded counter pattern — increment without enforced bound
+The log-only guard — no return -1
+The connection to <code>slice_table</code> — a uint16_t* array
+We then consulted h264.h and confirmed:</p>
+<p><code>slice_num</code> is int (32-bit, line 361)
+<code>slice_table</code> is uint16_t* (16-bit, line 363)
+The sentinel value from <code>memset(..., -1, ...)</code> is 0xFFFF = 65535
+The collision became obvious: when current_slice reaches 65535, <code>slice_num</code> truncates to 0xFFFF when stored in <code>slice_table</code>, matching the sentinel exactly.</p>
+<h3 id="43-tracing-the-consequence">4.3 Tracing the Consequence</h3>
+<p>We followed the data flow from slice_table to its consumers in fill_caches (h264.h lines 793-831):</p>
+<pre class="hljs"><code><div>top_type = h-&gt;slice_table[top_xy] &lt; 0xFFFF
+    ? s-&gt;current_picture.mb_type[top_xy] : 0;
+</div></code></pre>
+<p>When <code>slice_table[top_xy]</code> is the sentinel 0xFFFF but a real slice also has number 65535, the comparison 0xFFFF &lt; 0xFFFF evaluates to false — correctly treating it as &quot;no neighbor.&quot; But in the non-deblocking path:</p>
+<pre class="hljs"><code><div>top_type = h-&gt;slice_table[top_xy] == h-&gt;slice_num
+    ? s-&gt;current_picture.mb_type[top_xy] : 0;
+</div></code></pre>
+<p>Here <code>0xFFFF == 65535</code> is true — falsely claiming the sentinel-initialized neighbor is in the current slice. This enables reads of uninitialized <code>mb_type</code>, <code>motion_val</code>, and <code>ref_index</code> data, which the deblocking filter then uses to compute write destinations in the frame buffer.</p>
+<h2 id="5-what-would-have-been-missed-without-datalog">5. What Would Have Been Missed Without Datalog</h2>
+<p>This section addresses a critical question.</p>
+<h3 id="51-the-llm-alone-powerful-but-undisciplined">5.1 The LLM Alone: Powerful but Undisciplined</h3>
+<p>An LLM reading this codebase without Datalog support would face several
+fundamental challenges:</p>
+<p><strong>Context window saturation.</strong> The four files total ~5,800 lines. The H.264
+decoder is dense — <code>decode_slice_header</code> alone is 460 lines, <code>fill_caches</code> is
+456 lines, and <code>hl_decode_mb_internal</code> is 256 lines. Loading all security-relevant
+functions simultaneously would consume most of a large context window, leaving
+little room for structured reasoning. Our pipeline solved this by having the LLM
+process one function at a time during extraction, then letting Datalog compose
+the cross-function results.</p>
+<p><strong>No systematic data flow.</strong> To find this bug, we needed to know that
+<code>context_count</code>, defined at line 2537, reaches line 2473 across loop iterations.
+An LLM can <em>guess</em> this by reading the code, but it cannot <em>prove</em> it. Our
+system computed 702 <code>DefReachesUse</code> pairs through formal Gen-Kill dataflow over
+514 CFG edges. Every data-flow connection used in the analysis was sound — not
+hallucinated.</p>
+<p><strong>Guard semantics are subtle.</strong> The distinction between <code>context_count == h-&gt;max_contexts</code> (equality, not a bound) and <code>context_count &lt; h-&gt;max_contexts</code>
+(proper upper bound) is the difference between a safe counter and an exploitable
+one. An LLM might notice this distinction, or might not — it depends on
+attention, prompt framing, and luck. The Datalog <code>HasUpperBound</code> rule encoded
+this distinction as a formal property: only <code>&lt;</code>, <code>&lt;=</code>, and their unsigned
+variants constitute upper bounds. The equality operator <code>==</code> is deliberately
+excluded. This is not a heuristic — it is a specification.</p>
+<p><strong>Combinatorial explosion.</strong> There are 73 functions, 38 sink sites, and 71 typed
+variables in the analysis scope. The number of potential (counter, index,
+type-mismatch) triples is enormous. An LLM asked &quot;find type safety bugs&quot; would
+likely focus on the most obvious patterns — explicit casts, <code>malloc</code> size
+arguments, <code>memcpy</code> lengths — and miss the subtle interaction between an
+<code>int</code> counter and a <code>uint16_t</code> sentinel. The Datalog engine evaluated <em>all</em>
+combinations exhaustively: every counter against every guard, every counter
+against every memory access, every type against the knowledge base. The 62
+findings it produced are the <em>complete</em> set for the rules defined, not a
+sample.</p>
+<h3 id="52-fuzzing-alone-fast-but-blind-to-type-semantics">5.2 Fuzzing Alone: Fast but Blind to Type Semantics</h3>
+<p>The bug report notes that this vulnerability &quot;has been missed by every fuzzer&quot;
+for over two decades. This is not surprising:</p>
+<p><strong>Triggering requires 65,536 slices.</strong> Most fuzzers use small inputs for
+performance. Generating a valid H.264 bitstream with 65,536 correctly formed
+slice headers, each passing <code>decode_slice_header</code>'s many validation checks
+(PPS/SPS references, ref_count bounds, QP range, deblocking parameters), is
+astronomically unlikely through random mutation. Coverage-guided fuzzers would
+need to discover, one by one, that each additional slice increases <code>current_slice</code>
+by one — 65,536 times — while maintaining bitstream validity at every step.</p>
+<p><strong>The crash is conditional on frame layout.</strong> Even with 65,536 slices, the OOB
+write only occurs if a macroblock in slice 65535 is at a frame edge where its
+neighbor's <code>slice_table</code> entry is still the sentinel <code>0xFFFF</code>. This requires
+specific slice-to-macroblock assignments that a fuzzer would need to stumble upon.</p>
+<p><strong>Type information is erased at runtime.</strong> A fuzzer monitors crashes and coverage.
+It cannot observe that <code>slice_num</code> (an <code>int</code> holding value 65535) and
+<code>slice_table[top_xy]</code> (a <code>uint16_t</code> holding value 0xFFFF) are <em>different things</em>
+that happen to have the same bit pattern. The type mismatch is a static property
+invisible to dynamic analysis.</p>
+<p>Our system detected this without executing any code. The <code>VarType</code> facts
+preserved the distinction between <code>int</code> and <code>uint16_t</code> that compilation erases,
+and the <code>UnboundedCounter</code> rule identified the missing bound that would take a
+fuzzer 65,536 iterations to discover.</p>
+<h3 id="53-traditional-static-analysis-sound-but-coarse">5.3 Traditional Static Analysis: Sound but Coarse</h3>
+<p>Tools like Coverity, CodeQL (GitHub's variant), or the Clang Static Analyzer
+could potentially detect pieces of this bug, but face their own gaps:</p>
+<p><strong>No sentinel-value reasoning.</strong> Standard static analyzers track null pointers,
+uninitialized memory, and buffer overflows. The concept of &quot;a counter value
+colliding with a sentinel value in a different-width storage&quot; is not a built-in
+check in any mainstream tool we are aware of. It requires understanding the
+<em>interaction</em> between type widths, initialization patterns, and comparison
+semantics — exactly what our <code>UnboundedCounter</code> + <code>ResolvedVarType</code> +
+<code>SignednessMismatch</code> rule composition captures.</p>
+<p><strong>Limited cross-domain reasoning.</strong> The bug spans three domains: (1) bitstream
+parsing (<code>decode_slice_header</code> increments the counter), (2) table management
+(<code>memset</code> initializes sentinels, <code>slice_table</code> stores truncated values), and
+(3) the deblocking filter (<code>fill_caches</code> compares against sentinels). Most
+static analyzers perform intraprocedural analysis or limited interprocedural
+analysis. Our backward slicing selected all three domains into the analysis
+set, and the Datalog rules operated uniformly across them.</p>
+<p><strong>Customization is hard.</strong> Writing a Coverity checker or CodeQL query for
+&quot;unbounded counter stored in narrower type that collides with a sentinel&quot; requires
+deep tool expertise and advance knowledge of the bug pattern. Our system
+discovered the pattern from generic rules — <code>UnboundedCounter</code> and
+<code>SignednessMismatch</code> are general-purpose rules that apply to any codebase.</p>
+<h3 id="54-datalog-alone-sound-but-needs-eyes">5.4 Datalog Alone: Sound but Needs Eyes</h3>
+<p>Conversely, Datalog without the LLM would also fall short:</p>
+<p><strong>No fact extraction.</strong> Datalog rules operate on relations. Someone must
+populate those relations from source code. Traditional approaches use compiler
+frontends (Clang AST, GCC GIMPLE) that require the code to compile — including
+all headers, build flags, and dependencies. FFmpeg's build system is notoriously
+complex. Our LLM reads raw source files with zero build configuration, extracting
+types, control flow, and data flow directly from the text.</p>
+<p><strong>No cross-struct reasoning.</strong> The critical connection — <code>h-&gt;slice_num</code> (declared
+as <code>int</code> in <code>H264Context</code>) flows into <code>h-&gt;slice_table[mb_xy]</code> (declared as
+<code>uint16_t*</code>) — happens through struct field accesses across functions. The LLM
+extracted <code>FieldWrite</code> and <code>VarType</code> facts that captured this, but the Datalog
+rules for <code>UnboundedCounter</code> operate on local variables. It was the LLM
+interpreter that connected the Datalog finding (&quot;counters are unbounded&quot;) to the
+struct-level type mismatch (&quot;the storage is 16-bit&quot;). This required reading the
+<code>H264Context</code> struct definition and understanding the semantic relationship
+between <code>slice_num</code> and <code>slice_table</code> — a task that requires natural language
+understanding of field names, comments, and usage patterns.</p>
+<p><strong>No exploit narrative.</strong> Datalog produces tuples: <code>(&quot;decode_nal_units&quot;, &quot;context_count&quot;, 2537)</code>. It cannot explain <em>why</em> this matters, <em>how</em> an attacker
+would trigger it, or <em>what</em> the consequence would be. The LLM's interpretation
+phase transformed 62 abstract findings into a concrete exploit chain with
+specific attacker actions, value ranges, and memory corruption consequences.</p>
+<h3 id="55-the-hybrid-advantage">5.5 The Hybrid Advantage</h3>
+<p>The table below summarizes what each component contributed:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>LLM Only</th>
+<th>Fuzzing</th>
+<th>Traditional SA</th>
+<th>Datalog Only</th>
+<th><strong>Our System</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Extract types from raw source (no build)</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Formal data flow (Gen-Kill)</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Exhaustive rule evaluation</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Distinguish <code>==</code> from <code>&lt;</code> in guards</td>
+<td>⚠️</td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Detect sentinel collision pattern</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>⚠️</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Explain exploit narrative</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Zero build configuration</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Finds this specific bug</td>
+<td>⚠️</td>
+<td>❌</td>
+<td>❌</td>
+<td>⚠️</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<p>The ⚠️ entries indicate &quot;possible in principle but unreliable in practice.&quot;</p>
+<hr>
+<h2 id="6-limitations-and-future-work">6. Limitations and Future Work</h2>
+<h3 id="61-what-we-partially-missed">6.1 What We Partially Missed</h3>
+<p>While we detected both ingredients of the vulnerability (unbounded counter and
+type width mismatch), the Datalog rules did not directly compose them into a
+single finding. The connection required LLM interpretation because:</p>
+<ul>
+<li>
+<p><code>current_slice</code> is a <strong>struct field</strong> (<code>h0-&gt;current_slice</code>), not a local
+variable. Our <code>UnboundedCounter</code> rule operates on <code>ArithOp</code> facts for local
+variables. Extending it to struct field increments would require <code>FieldWrite</code>-aware
+counter tracking.</p>
+</li>
+<li>
+<p>The <strong>sentinel value</strong> <code>0xFFFF</code> from <code>memset(..., -1, ...)</code> is not modeled in
+our Datalog rules. Adding a <code>SentinelInit</code> relation and rules to detect
+counter-sentinel collisions would make this fully automatic.</p>
+</li>
+<li>
+<p>The <strong>truncation</strong> from <code>int</code> to <code>uint16_t</code> happens implicitly through struct
+field assignment, not through an explicit cast. Our <code>ImplicitTruncation</code> rule
+requires both source and destination to be local variables with <code>VarType</code> facts.</p>
+</li>
+</ul>
+<h3 id="62-planned-improvements">6.2 Planned Improvements</h3>
+<p>Based on this case study, we plan to add:</p>
+<ol>
+<li>
+<p><strong>FieldCounter rule</strong>: Track struct fields that are incremented through
+<code>FieldWrite</code> patterns, extending <code>UnboundedCounter</code> to interprocedural
+counters.</p>
+</li>
+<li>
+<p><strong>SentinelCollision rule</strong>: Detect when a counter variable's type is wider
+than the storage it flows into, and the storage is initialized to a sentinel
+value that falls within the counter's reachable range.</p>
+</li>
+<li>
+<p><strong>Cross-width comparison rule</strong>: Flag comparisons where one operand comes
+from wider storage (e.g., <code>int slice_num</code>) and the other from narrower
+storage (e.g., <code>uint16_t slice_table[]</code>), especially when the wider value
+can reach the narrower type's maximum.</p>
+</li>
+</ol>
+<hr>
+<h2 id="7-conclusion">7. Conclusion</h2>
+<p>We have demonstrated that NeuroLog — a hybrid system combining LLM fact
+extraction with Soufflé Datalog formal reasoning — can detect a real-world
+vulnerability that evaded two decades of fuzzing and human review. The key
+findings:</p>
+<ol>
+<li>
+<p><strong>The Datalog rules were necessary.</strong> The <code>UnboundedCounter</code> rule's formal
+distinction between <code>==</code> guards and <code>&lt;</code> guards, combined with
+<code>CounterUsedAsIndex</code> data flow tracking, identified the precise code pattern
+that enables exploitation. An LLM alone might notice these issues
+individually but cannot guarantee exhaustive evaluation across 73 functions.</p>
+</li>
+<li>
+<p><strong>The LLM was necessary.</strong> Without the LLM, we would have no facts to reason
+about — the source code would remain unstructured text. The LLM extracted
+2,489 structured facts from 16 functions, including the critical <code>VarType</code>,
+<code>ArithOp</code>, <code>Guard</code>, and <code>CFGEdge</code> relations that the Datalog engine consumed.
+Additionally, the LLM's interpretation phase connected abstract Datalog
+findings to a concrete exploit chain.</p>
+</li>
+<li>
+<p><strong>The combination found what neither could alone.</strong> The bug is a <em>composition</em>
+of properties: an unbounded counter (Rule 9), stored in narrower-typed
+storage (type knowledge base), that collides with a sentinel value
+(semantic reasoning). No single analysis technique covers all three.
+Our pipeline distributed the work: tree-sitter for scanning, backward slicing
+for scoping, LLM for extraction, Datalog for formal inference, and LLM again
+for interpretation.</p>
+</li>
+</ol>
+<p>The vulnerability in FFmpeg's H.264 decoder — introduced in 2003, weaponized
+by a 2010 refactor, and finally fixed in 2025 — is precisely the kind of bug
+that falls through the cracks of existing tooling. It is too subtle for
+fuzzers (requiring 65,536 valid slices), too cross-cutting for traditional
+static analyzers (spanning parsing, table management, and filtering), and too
+combinatorial for unaided human review. It is, however, well within reach of
+a system that combines the language understanding of an LLM with the formal
+guarantees of Datalog.</p>
+<hr>
+<h2 id="appendix-a-full-datalog-output-for-key-relations">Appendix A: Full Datalog Output for Key Relations</h2>
+<h3 id="a1-unboundedcounter-14-rows">A.1 UnboundedCounter (14 rows)</h3>
+<p>decode_frame nalsize 2689 decode_frame nalsize 2699 decode_frame p 2687 decode_frame p 2694 decode_frame p 2704 decode_frame i+1 2661 decode_frame i+1 2853 decode_nal_units buf_index 2451 decode_nal_units buf_index 2469 decode_nal_units buf_index 2491 decode_nal_units context_count 2537 decode_nal_units context_count 2566 decode_nal_units next_avc 2458 ff_h264_frame_start __expr_size 924</p>
+<h3 id="a2-counterusedasindex-27-rows-grouped-by-variable">A.2 CounterUsedAsIndex (27 rows, grouped by variable)</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Incr Line</th>
+<th>Use Line</th>
+<th>Access Kind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>buf_index</code></td>
+<td>2451</td>
+<td>2448</td>
+<td>mem_read_offset</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2451</td>
+<td>2463</td>
+<td>mem_read_offset</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2451</td>
+<td>2451</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2451</td>
+<td>2458</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2451</td>
+<td>2469</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2451</td>
+<td>2491</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2469</td>
+<td>2448</td>
+<td>mem_read_offset</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2469</td>
+<td>2463</td>
+<td>mem_read_offset</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2469</td>
+<td><em>(6 more)</em></td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>buf_index</code></td>
+<td>2491</td>
+<td><em>(6 more)</em></td>
+<td>ptr_arith / mem_read</td>
+</tr>
+<tr>
+<td><code>context_count</code></td>
+<td>2537</td>
+<td>2473</td>
+<td>mem_read_offset</td>
+</tr>
+<tr>
+<td><code>context_count</code></td>
+<td>2537</td>
+<td>2537</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>context_count</code></td>
+<td>2537</td>
+<td>2566</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>context_count</code></td>
+<td>2566</td>
+<td>2473</td>
+<td>mem_read_offset</td>
+</tr>
+<tr>
+<td><code>context_count</code></td>
+<td>2566</td>
+<td>2537</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>context_count</code></td>
+<td>2566</td>
+<td>2566</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>2687</td>
+<td>2694</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>2694</td>
+<td>2694</td>
+<td>ptr_arith</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>2704</td>
+<td>2704</td>
+<td>ptr_arith</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a3-potentialarithoverflow-2-rows">A.3 PotentialArithOverflow (2 rows)</h3>
+<p>decode_nal_units 2458 next_avc add int 4 decode_nal_units 2481 bit_length mul int 4</p>
+<hr>
+<h2 id="appendix-b-fact-extraction-statistics">Appendix B: Fact Extraction Statistics</h2>
+<table>
+<thead>
+<tr>
+<th>Relation</th>
+<th>Rows</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VarType</td>
+<td>71</td>
+<td>Source-level type annotations</td>
+</tr>
+<tr>
+<td>Def</td>
+<td>141</td>
+<td>Variable definition sites</td>
+</tr>
+<tr>
+<td>Use</td>
+<td>590</td>
+<td>Variable use sites</td>
+</tr>
+<tr>
+<td>CFGEdge</td>
+<td>514</td>
+<td>Control flow edges</td>
+</tr>
+<tr>
+<td>ArithOp</td>
+<td>45</td>
+<td>Arithmetic operations</td>
+</tr>
+<tr>
+<td>Guard</td>
+<td>95</td>
+<td>Conditional bound checks</td>
+</tr>
+<tr>
+<td>Call</td>
+<td>127</td>
+<td>Function call sites</td>
+</tr>
+<tr>
+<td>ActualArg</td>
+<td>315</td>
+<td>Arguments at call sites</td>
+</tr>
+<tr>
+<td>FieldRead</td>
+<td>312</td>
+<td>Struct field reads</td>
+</tr>
+<tr>
+<td>FieldWrite</td>
+<td>104</td>
+<td>Struct field writes</td>
+</tr>
+<tr>
+<td>MemRead</td>
+<td>42</td>
+<td>Memory read operations</td>
+</tr>
+<tr>
+<td>MemWrite</td>
+<td>33</td>
+<td>Memory write operations</td>
+</tr>
+<tr>
+<td>ReturnVal</td>
+<td>11</td>
+<td>Function return values</td>
+</tr>
+<tr>
+<td>FormalParam</td>
+<td>19</td>
+<td>Function parameter declarations</td>
+</tr>
+<tr>
+<td>AddressOf</td>
+<td>25</td>
+<td>Address-of operations</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>2,489</strong></td>
+<td><strong>Across 16 target functions</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="appendix-c-derived-analysis-output">Appendix C: Derived Analysis Output</h2>
+<table>
+<thead>
+<tr>
+<th>Output Relation</th>
+<th>Rows</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DefReachesUse</td>
+<td>702</td>
+<td>Reaching definition pairs</td>
+</tr>
+<tr>
+<td>ResolvedVarType</td>
+<td>107</td>
+<td>Types validated against knowledge base</td>
+</tr>
+<tr>
+<td>TypeSafetyFinding</td>
+<td>62</td>
+<td>All type-safety findings (summary)</td>
+</tr>
+<tr>
+<td>CounterUsedAsIndex</td>
+<td>27</td>
+<td>Unbounded counters used in memory ops</td>
+</tr>
+<tr>
+<td>SignednessMismatch</td>
+<td>20</td>
+<td>Signed/unsigned confusion</td>
+</tr>
+<tr>
+<td>UnboundedCounter</td>
+<td>14</td>
+<td>Increments without upper-bound guard</td>
+</tr>
+<tr>
+<td>PointsTo</td>
+<td>32</td>
+<td>Pointer alias pairs</td>
+</tr>
+<tr>
+<td>IsParam</td>
+<td>19</td>
+<td>Parameter identification</td>
+</tr>
+<tr>
+<td>CopySite</td>
+<td>7</td>
+<td>Memory copy operations</td>
+</tr>
+<tr>
+<td>GlobalVar</td>
+<td>8</td>
+<td>Global variable accesses</td>
+</tr>
+<tr>
+<td>PotentialArithOverflow</td>
+<td>2</td>
+<td>Integer overflow risks</td>
+</tr>
+<tr>
+<td>UnknownType</td>
+<td>2</td>
+<td>Types not in knowledge base</td>
+</tr>
+</tbody>
+</table>
+
+</body>
+</html>
