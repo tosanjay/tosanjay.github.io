@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanjay's Home</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --tag-bg: #1f3a5f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 0 1.5rem;
+      text-align: center;
+    }
+    header h1 { font-size: 1.9rem; font-weight: 700; }
+    header p  { color: var(--text-muted); margin-top: 0.4rem; font-size: 0.95rem; }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 0.8rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    nav a { color: var(--text-muted); }
+    nav a:hover { color: var(--accent); }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-size: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+      color: var(--text);
+    }
+
+    /* ── About ── */
+    .about-grid {
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .about-text p { color: var(--text-muted); margin-bottom: 0.6rem; }
+    .links-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    .links-row a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.3rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .links-row a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+
+    /* ── Blog posts ── */
+    .post-list { list-style: none; }
+    .post-list li {
+      padding: 0.85rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .post-list li:last-child { border-bottom: none; }
+    .post-date { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+
+    /* ── Repo cards ── */
+    .repo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .repo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      transition: border-color 0.2s;
+    }
+    .repo-card:hover { border-color: var(--accent); }
+    .repo-card h3 { font-size: 0.95rem; }
+    .repo-card p  { font-size: 0.82rem; color: var(--text-muted); flex: 1; }
+    .repo-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .repo-meta span { display: flex; align-items: center; gap: 0.25rem; }
+    .lang-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      background: var(--tag-bg);
+      color: var(--accent);
+      border-radius: 4px;
+      padding: 0.1rem 0.45rem;
+    }
+    #repos-status { color: var(--text-muted); font-size: 0.9rem; }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ────────────── Header ────────────── -->
+<header>
+  <h1>Sanjay's Research Home</h1>
+  <p>Security Research · Binary Analysis · Fuzzing · Program Analysis</p>
+</header>
+
+<nav>
+  <a href="#about">About</a>
+  <a href="#blogs">Blogs</a>
+  <a href="#repos">Repos</a>
+</nav>
+
+<!-- ────────────── Main ────────────── -->
+<main>
+
+  <!-- About -->
+  <section id="about">
+    <h2>About</h2>
+    <div class="about-grid">
+      <div class="about-text">
+        <p>
+          Security researcher focused on binary vulnerability analysis, fuzzing,
+          and automated program analysis. I build tools that bridge static analysis,
+          dynamic analysis, and LLM-assisted reasoning.
+        </p>
+        <p>
+          Current interests: binary analysis with LLM agents, datalog-based
+          vulnerability analysis, and coverage-guided fuzzing for real-world targets.
+        </p>
+        <div class="links-row">
+          <a href="https://github.com/tosanjay" target="_blank" rel="noopener">
+            <!-- GitHub icon -->
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+                       0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+                       -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+                       .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+                       -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0
+                       1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56
+                       .82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07
+                       -.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Technical Blogs -->
+  <section id="blogs">
+    <h2>Technical Blogs</h2>
+    <ul class="post-list">
+      <!-- Add blog posts here. Example entries: -->
+      <li>
+        <a href="#">Coming soon — Binary Analysis with LLM Agents</a>
+        <span class="post-date">2026</span>
+      </li>
+      <li>
+        <a href="#">Coming soon — Datalog-based Vulnerability Detection</a>
+        <span class="post-date">2026</span>
+      </li>
+      <li>
+        <a href="#">Coming soon — Coverage-guided Fuzzing for libtiff</a>
+        <span class="post-date">2026</span>
+      </li>
+    </ul>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-top:0.75rem;">
+      Detailed write-ups coming soon.
+    </p>
+  </section>
+
+  <!-- GitHub Repos -->
+  <section id="repos">
+    <h2>GitHub Repos</h2>
+    <p id="repos-status">Loading repositories…</p>
+    <div class="repo-grid" id="repo-grid"></div>
+  </section>
+
+</main>
+
+<footer>
+  Built with plain HTML &amp; CSS · Hosted on <a href="https://pages.github.com" target="_blank" rel="noopener">GitHub Pages</a>
+</footer>
+
+<!-- ────────────── Fetch repos from GitHub API ────────────── -->
+<script>
+  const GITHUB_USER = "tosanjay";
+  const LANG_COLORS = {
+    Python: "#3572A5", JavaScript: "#f1e05a", TypeScript: "#2b7489",
+    C: "#555555", "C++": "#f34b7d", Rust: "#dea584", Go: "#00ADD8",
+    Shell: "#89e051", Markdown: "#083fa1", HTML: "#e34c26",
+  };
+
+  async function loadRepos() {
+    const status = document.getElementById("repos-status");
+    const grid   = document.getElementById("repo-grid");
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/users/${GITHUB_USER}/repos?sort=updated&per_page=12`,
+        { headers: { Accept: "application/vnd.github+json" } }
+      );
+      if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+      const repos = await res.json();
+
+      status.textContent = "";
+
+      // Filter out forks if desired (remove the filter to show forks too)
+      const shown = repos.filter(r => !r.fork).slice(0, 12);
+
+      if (shown.length === 0) {
+        status.textContent = "No public repositories yet.";
+        return;
+      }
+
+      shown.forEach(repo => {
+        const color = LANG_COLORS[repo.language] || "#8b949e";
+        const card = document.createElement("div");
+        card.className = "repo-card";
+        card.innerHTML = `
+          <h3><a href="${repo.html_url}" target="_blank" rel="noopener">${repo.name}</a></h3>
+          <p>${repo.description || "<em>No description</em>"}</p>
+          <div class="repo-meta">
+            ${repo.language
+              ? `<span><span class="lang-dot" style="background:${color}"></span>${repo.language}</span>`
+              : ""}
+            <span>⭐ ${repo.stargazers_count}</span>
+            <span>🍴 ${repo.forks_count}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    } catch (err) {
+      status.textContent = `Could not load repositories (${err.message}).`;
+    }
+  }
+
+  loadRepos();
+</script>
+
+</body>
+</html>
