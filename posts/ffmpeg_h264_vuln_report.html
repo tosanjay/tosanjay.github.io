@@ -368,7 +368,7 @@ code {
   </script>
 <h1 id="detecting-a-21-year-old-ffmpeg-vulnerability-using-llm-augmented-datalog-analysis">Detecting a 21-Year-Old FFmpeg Vulnerability Using LLM-Augmented Datalog Analysis</h1>
 <h2 id="how-neurolog-found-the-h264-slice-table-sentinel-collision-bug">How NeuroLog Found the H.264 Slice Table Sentinel Collision Bug</h2>
-<p><strong>Date:</strong> June 2025
+<p><strong>Date:</strong> April 2026
 <strong>Target:</strong> FFmpeg H.264 Decoder (<code>h264.c</code>, <code>h264.h</code>)
 <strong>Vulnerability:</strong> Unbounded 32-bit slice counter collides with 16-bit sentinel value <code>0xFFFF</code>, causing heap OOB write in the deblocking filter
 <strong>Fix Commit:</strong> <a href="https://github.com/FFmpeg/FFmpeg/commit/c988f97566">FFmpeg/FFmpeg@c988f97566</a>
@@ -376,7 +376,8 @@ code {
 <strong>Tool:</strong> NeuroLog — an LLM-augmented Datalog-based source code analysis system</p>
 <hr>
 <h2 id="executive-summary">Executive Summary</h2>
-<p>We describe how <strong>NeuroLog</strong>, a hybrid system combining Large Language Model (LLM) fact extraction with Soufflé Datalog formal reasoning, detected a recently disclosed vulnerability in FFmpeg's H.264 decoder — a bug that had evaded every fuzzer and human reviewer for over two decades.</p>
+<p>We describe how <strong>NeuroLog</strong>, a hybrid system combining Large Language Model (LLM) fact extraction with Soufflé Datalog formal reasoning, detected a recently disclosed vulnerability in FFmpeg's H.264 decoder by 
+<strong>Anthropic's Mythos Model</strong> <a href="https://red.anthropic.com/2026/mythos-preview/">A 16-year-old FFmpeg vulnerability</a> — a bug that had evaded every fuzzer and human reviewer for over two decades.</p>
 <p>The vulnerability arises from the interaction of two properties:</p>
 <ol>
 <li>A <strong>32-bit integer slice counter</strong> (<code>current_slice</code>) that increments without an enforced upper bound</li>
