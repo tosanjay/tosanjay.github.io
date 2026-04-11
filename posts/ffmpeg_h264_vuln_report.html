@@ -582,10 +582,10 @@ DefReachesUse	702	Reaching definition pairs (data flow backbone)
 ResolvedVarType	107	LLM types validated against knowledge base
 </div></code></pre>
 <h3 id="26-phase-5--interpreting-the-findings">2.6 Phase 5 — Interpreting the Findings</h3>
-<p>We read the Datalog output and cross-referenced it with the source code. Two findings immediately stood out as related:</p>
+<p>The LLM read the Datalog output and cross-referenced it with the decompiled source code. Two findings immediately stood out as related:</p>
 <p><strong>Finding A</strong> — In decode_nal_units, context_count was flagged as an UnboundedCounter (incremented at lines 2537 and 2566) that is also a CounterUsedAsIndex (used to index h-&gt;thread_context[] at line 2473).</p>
 <p><strong>Finding B</strong> — Multiple SignednessMismatch entries across the codebase showed pointer-to-integer confusion, but more importantly, the pattern of int variables being used in contexts where they flow into narrower storage was pervasive.</p>
-<p>We then manually examined the decode_slice_header function (which the pipeline had selected as a target but whose current_slice counter facts were captured through field writes and call-site analysis). By reading lines 2084-2087, we found the smoking gun:</p>
+<p>The LLM then analyzed the decode_slice_header function (which the pipeline had selected as a target but whose current_slice counter facts were captured through field writes and call-site analysis). By reading lines 2084-2087, it identified the smoking gun:</p>
 <pre class="hljs"><code><div>h-&gt;slice_num = ++h0-&gt;current_slice;
 if(h-&gt;slice_num &gt;= MAX_SLICES){
     av_log(s-&gt;avctx, AV_LOG_ERROR, &quot;Too many slices...&quot;);
@@ -753,25 +753,25 @@ decode_nal_units  2566  counter_used_as_index  context_count  mem_read_offset in
 </div></code></pre>
 <p>This told us: &quot;In decode_nal_units, the variable context_count is incremented at two separate code locations and used as a memory index, but has no upper-bound guard.&quot;</p>
 <h3 id="42-what-we-did-next">4.2 What We Did Next</h3>
-<p>We read decode_nal_units and immediately saw the pattern: context_count indexes into h-&gt;thread_context[], but its guard is an equality check at the bottom of the loop. This was clearly an OOB risk, but it was a localized single-function bug.</p>
-<p>The deeper insight came when we noticed the Datalog output did not flag current_slice as an unbounded counter — because decode_slice_header was analyzed but current_slice is a struct field write (h0-&gt;current_slice), not a local variable with ArithOp facts. The LLM had extracted it as a FieldWrite, not as a local ArithOp.</p>
-<p>This is where human+LLM reasoning transcended what the Datalog rules alone could express. We read decode_slice_header at line 2084:</p>
+<p>The LLM read decode_nal_units and immediately identified the pattern: context_count indexes into h-&gt;thread_context[], but its guard is an equality check at the bottom of the loop. This was clearly an OOB risk, but it was a localized single-function bug.</p>
+<p>The deeper insight came when the LLM noticed the Datalog output did not flag current_slice as an unbounded counter — because decode_slice_header was analyzed but current_slice is a struct field write (h0-&gt;current_slice), not a local variable with ArithOp facts. It had been extracted as a FieldWrite, not as a local ArithOp.</p>
+<p>This is where Datalog+LLM reasoning transcended what the Datalog rules alone could express. The LLM read decode_slice_header at line 2084:</p>
 <pre class="hljs"><code><div>h-&gt;slice_num = ++h0-&gt;current_slice;
 if(h-&gt;slice_num &gt;= MAX_SLICES){
     av_log(s-&gt;avctx, AV_LOG_ERROR, &quot;Too many slices...&quot;);
 }
 </div></code></pre>
-<p>We recognized:</p>
+<p>The LLM recognized:</p>
 <p>The same unbounded counter pattern — increment without enforced bound
 The log-only guard — no return -1
 The connection to <code>slice_table</code> — a uint16_t* array
-We then consulted h264.h and confirmed:</p>
+The LLM then consulted h264.h and confirmed:</p>
 <p><code>slice_num</code> is int (32-bit, line 361)
 <code>slice_table</code> is uint16_t* (16-bit, line 363)
 The sentinel value from <code>memset(..., -1, ...)</code> is 0xFFFF = 65535
 The collision became obvious: when current_slice reaches 65535, <code>slice_num</code> truncates to 0xFFFF when stored in <code>slice_table</code>, matching the sentinel exactly.</p>
 <h3 id="43-tracing-the-consequence">4.3 Tracing the Consequence</h3>
-<p>We followed the data flow from slice_table to its consumers in fill_caches (h264.h lines 793-831):</p>
+<p>The LLM followed the data flow from slice_table to its consumers in fill_caches (h264.h lines 793-831):</p>
 <pre class="hljs"><code><div>top_type = h-&gt;slice_table[top_xy] &lt; 0xFFFF
     ? s-&gt;current_picture.mb_type[top_xy] : 0;
 </div></code></pre>
