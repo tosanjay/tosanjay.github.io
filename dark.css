@@ -1,0 +1,47 @@
+/* Dark theme override for blog posts converted from VS Code markdown export.
+   Usage: add this ONE line inside <head> of any post:
+   <link rel="stylesheet" href="/dark.css"> */
+
+body {
+  background-color: #0d1117 !important;
+  color: #c9d1d9 !important;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #e6edf3 !important;
+  border-bottom-color: #30363d !important;
+}
+
+/* Links */
+a { color: #58a6ff !important; }
+a:hover { color: #79c0ff !important; }
+
+/* Code blocks */
+pre, code {
+  background-color: #161b22 !important;
+  color: #e6edf3 !important;
+  border: 1px solid #30363d !important;
+  border-radius: 6px;
+}
+
+/* Inline code */
+:not(pre) > code {
+  background-color: #1f2937 !important;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+/* Blockquotes */
+blockquote {
+  border-left-color: #3d444d !important;
+  color: #8b949e !important;
+}
+
+/* Tables */
+table th, table td { border-color: #30363d !important; }
+table tr:nth-child(even) { background-color: #161b22 !important; }
+table tr:hover { background-color: #1c2128 !important; }
+
+/* Horizontal rules */
+hr { border-color: #30363d !important; }
