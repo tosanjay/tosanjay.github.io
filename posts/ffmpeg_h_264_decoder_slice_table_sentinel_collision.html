@@ -372,7 +372,7 @@ code {
 <p>I went through the same exercise first using <strong>NeuroLog</strong>, my source-code-level LLM analysis pipeline — that report is <a href="https://tosanjay.github.io/posts/ffmpeg_h264_vuln_report.html">published here</a>. The natural next question was: can we find the same bug starting entirely from a <strong>compiled binary</strong>, without source code? That is what <strong>BinCodeQL</strong> is designed for. BinCodeQL combines static binary analysis (via Binary Ninja) with a Datalog fact engine and an LLM reasoning layer. In the first analysis attempt, the tool identified a related finding but could not fully connect the dots — some Datalog rules needed to bridge the <code>slice_num</code> counter, the uint16_t store, and the sentinel-init pattern were too generic and missed the multi-step chain. I improved the rulebase with more fine-grain, but still generic rules and ran the analysis again. This report is the result of that second run. The entire analysis was driven by Claude Sonnet 4.6 with a budget under $12, prompted with nothing more specific than: <em>&quot;look for memory corruption bugs — integer overflow, signed casting, unbounded access — in H.264-related functionality.&quot;</em></p>
 <h2 id="metadata">Metadata</h2>
 <ul>
-<li><strong>binary:</strong> <code>/media/sanjay/f574986f-8197-4e72-a69d-87ddf200a6a9/sanjay/tools/ffmpeg-8.0.1/ffmpeg_g.bndb</code></li>
+<li><strong>binary:</strong> <code>ffmpeg-8.0.1/ffmpeg_g.bndb</code></li>
 <li><strong>timestamp:</strong> 2026-04-21T06:25:59Z</li>
 <li><strong>status:</strong> inconclusive</li>
 <li><strong>finding_count:</strong> 3</li>

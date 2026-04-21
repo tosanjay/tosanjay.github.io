@@ -13,7 +13,7 @@ I went through the same exercise first using **NeuroLog**, my source-code-level 
 
 ## Metadata
 
-- **binary:** `/media/sanjay/f574986f-8197-4e72-a69d-87ddf200a6a9/sanjay/tools/ffmpeg-8.0.1/ffmpeg_g.bndb`
+- **binary:** `ffmpeg-8.0.1/ffmpeg_g.bndb`
 - **timestamp:** 2026-04-21T06:25:59Z
 - **status:** inconclusive
 - **finding_count:** 3
