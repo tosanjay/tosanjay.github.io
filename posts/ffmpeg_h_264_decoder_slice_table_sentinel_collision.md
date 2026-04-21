@@ -64,14 +64,14 @@ I went through the same exercise first using **NeuroLog**, my source-code-level 
 **Confidence:** plausible-unverified
 
 ## Hypotheses considered
-```tsv
+
 | # | Hypothesis | Verdict | Facts checked | MCP checked | Note |
 |---|---|---|---|---|---|
 | 1 | slice_table sentinel collision: slice_num >= 0xFFFF causes false neighbor match | plausible-unverified | SentinelMemset.csv: 0xb956f6 memset with 0xFFFFFFFF confirmed, Uint16AllocSite.csv: 5 uint16_t alloc sites including slice_table_base at 0xb955b0, MLIL-SSA 0xb956c3: rsi_1#1 = 0xffffffff, CabacStore16.csv: 33 stores, NarrowStore16WithWidth — all width=2 (already 16-bit vars), GuardOnStore16Var.csv: only 1 guard = ne-0, NO upper bound on slice_num before write, decompile_function(ff_h264_decode_mb_cabac) 0x125bd84: slice_table write confirmed, decompile_function(ff_h264_decode_mb_cabac) 0x125ce42: sentinel equality check confirmed | decompile_function(ff_h264_alloc_tables) — confirmed uint16_t alloc + memset(0xFFFFFFFF), decompile_function(ff_h264_decode_mb_cabac) — confirmed slice_table[mb_xy]=(slice_num).w write and slice_table[neighbor]==slice_num read-back | Structural sentinel-collision shape present; exploitation requires bitstream with >=65535 slices. No guard refutes this. NOT confirmed exploitable in this build without dynamic tracing. |
 | 2 | signed int32 overflow in (nb_slice_ctx * mb_stride << 4) before sx.q alloc-size | plausible-unverified | MulInAlloc.csv: 0xb95564 mul nb_slice_ctx*mb_stride (int32), LShlInAlloc.csv: 0xb95567 lsl *16 (int32), MLIL-SSA 0xb9556a: sx.q(rbp_2#3) then passed to av_calloc, LShiftSxToAlloc.csv: no match (multi-step chain not captured by single-step rule) | get_il(ff_h264_alloc_tables, mlil, ssa=True) — confirmed full arithmetic chain, decompile_function(ff_h264_alloc_tables) — nmemb_1 = sx.q((nb_slice_ctx*mb_stride)<<4) | Overflow requires nb_slice_ctx * mb_stride * 16 > INT32_MAX. mb_stride max ~1025, nb_slice_ctx bounded by thread count (typically <= 64). Max plausible: 64*1025*16 = 1,049,600 — far from INT32_MAX (2.1B). Likely safe in practice without extremely high thread counts. |
 | 3 | rax_329/r9_64 motion vector stores are NOT sentinel-collision candidates | refuted | Rax329Arith.csv: rax_329#250 = rax_328#249.w + rbp_10 — MV delta accumulation (int16 add), R9_64Arith.csv: r9_64#49 = r8_46#65 + r9_63#48.r9w — MV component add, decompile_function(ff_h264_decode_mb_cabac) 0x125e9f5: r9_64 = rax_327.w + var_e0.w — motion vector X, decompile_function(ff_h264_decode_mb_cabac) 0x125e9f8: rax_329 = rax_328.w + rbp_10 — motion vector Y | decompile_function(ff_h264_decode_mb_cabac) — confirmed rax_329/r9_64 are mv_cache stores, not slice_table | These are motion vector components stored to mv_cache[]. The stores to mv_cache are expected int16 operations. The 33 CabacStore16 entries are mostly mv_cache stores, not slice_table writes. |
 | 4 | cbp_table store of var_130_1.w — could be wide value narrowed | plausible-unverified | CabacStore16.csv: addr=19252805, var=rdx_47#57, width=2, decompile_function 0x125c29d: cbp_table_1[rax_7] = var_130_1.w — CBP truncated to 16-bit, No guard found on var_130_1 before the 16-bit store | decompile_function(ff_h264_decode_mb_cabac) | var_130_1 is the coded block pattern, max value 0x30 for 4:2:0. Cannot overflow 16-bit. Safe. |
-```
+
 ## Notes
 
 ## Analysis Summary
