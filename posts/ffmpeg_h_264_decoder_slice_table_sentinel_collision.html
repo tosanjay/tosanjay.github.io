@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ffmpeg_h_264_decoder_slice_table_sentinel_collision.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+<link rel="stylesheet" href="/dark.css">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="ffmpeg-h264-decoder--slice_table-sentinel-collision--alloc-size-signed-overflow-review">FFmpeg H.264 Decoder — slice_table Sentinel Collision &amp; Alloc-Size Signed-Overflow Review</h1>
+<h2 id="introduction">Introduction</h2>
+<p>In April 2026, Anthropic published a <a href="https://red.anthropic.com/2026/mythos-preview/">detailed report</a> on the cybersecurity capabilities of their Claude Mythos Preview model. Among its findings was a 16-year-old vulnerability in FFmpeg's H.264 decoder — a <code>slice_table</code> sentinel collision bug introduced as far back as a 2003 commit and turned into an exploitable condition in a 2010 refactor (<a href="https://code.ffmpeg.org/FFmpeg/FFmpeg/pulls/22499/files">patch</a>). The bug had evaded every fuzzer and human code reviewer for over a decade. Shortly after, several other research teams and tool authors demonstrated that their own LLM-assisted tools could independently rediscover the same vulnerability — without Mythos. Those efforts, including Anthropic's own, were exclusively based on <strong>source code analysis</strong>: the LLM read and reasoned over C source files directly.</p>
+<p>I went through the same exercise first using <strong>NeuroLog</strong>, my source-code-level LLM analysis pipeline — that report is <a href="https://tosanjay.github.io/posts/ffmpeg_h264_vuln_report.html">published here</a>. The natural next question was: can we find the same bug starting entirely from a <strong>compiled binary</strong>, without source code? That is what <strong>BinCodeQL</strong> is designed for. BinCodeQL combines static binary analysis (via Binary Ninja) with a Datalog fact engine and an LLM reasoning layer. In the first analysis attempt, the tool identified a related finding but could not fully connect the dots — some Datalog rules needed to bridge the <code>slice_num</code> counter, the uint16_t store, and the sentinel-init pattern were too generic and missed the multi-step chain. I improved the rulebase with more fine-grain, but still generic rules and ran the analysis again. This report is the result of that second run. The entire analysis was driven by Claude Sonnet 4.6 with a budget under $12, prompted with nothing more specific than: <em>&quot;look for memory corruption bugs — integer overflow, signed casting, unbounded access — in H.264-related functionality.&quot;</em></p>
+<h2 id="metadata">Metadata</h2>
+<ul>
+<li><strong>binary:</strong> <code>/media/sanjay/f574986f-8197-4e72-a69d-87ddf200a6a9/sanjay/tools/ffmpeg-8.0.1/ffmpeg_g.bndb</code></li>
+<li><strong>timestamp:</strong> 2026-04-21T06:25:59Z</li>
+<li><strong>status:</strong> inconclusive</li>
+<li><strong>finding_count:</strong> 3</li>
+<li><strong>hypothesis_count:</strong> 4</li>
+</ul>
+<h2 id="findings">Findings</h2>
+<h3 id="medium">[MEDIUM]</h3>
+<h4 id="sentinel_collision_risk-ff_h264_alloc_tables--ff_h264_decode_mb_cabac--0xb956f6"><strong>sentinel_collision_risk</strong> <code>ff_h264_alloc_tables / ff_h264_decode_mb_cabac</code> @ 0xb956f6</h4>
+<p><strong>Evidence:</strong></p>
+<ul>
+<li>SentinelMemset.csv: <code>call_addr=12146422</code> (0xb956f6), callee='memset', fill_val='4294967295' (0xFFFFFFFF)</li>
+<li>Uint16AllocSite.csv: 5 alloc sites with elem_width=2 including 0xb955b0 (slice_table_base), 0xb955cd (cbp_table)</li>
+<li>MLIL-SSA <code>0xb956c3: rsi_1#1 = 0xffffffff</code> (fill arg to memset over slice_table_base)</li>
+<li>MLIL-SSA <code>0xb9571b: h-&gt;slice_table = &amp;h-&gt;slice_table_base[sx.q((mb_stride*2).d)+1]</code> (uint16_t pointer)</li>
+<li>decompile <code>ff_h264_decode_mb_cabac 0x125bd84: h_1-&gt;slice_table[rax_7] = (sl_2-&gt;slice_num).w</code> — .w truncation to 16-bit</li>
+<li>decompile <code>ff_h264_decode_mb_cabac 0x125c645: h_1-&gt;slice_table[mb_xy] = (sl_2-&gt;slice_num).w</code> (skipped MB path)</li>
+<li>decompile <code>ff_h264_decode_mb_cabac 0x125ce42: rax_122.b = zx.d(h_1-&gt;slice_table[rdx_79]) == sl_2-&gt;slice_num</code> (sentinel read-back equality test)</li>
+<li>GuardOnStore16Var.csv: only 1 guard on any 16-bit store variable — a ne-0 check, NOT an upper bound on slice_num</li>
+<li>CabacStore16.csv: 33 narrow 16-bit stores in ff_h264_decode_mb_cabac with no upper-bound guard</li>
+</ul>
+<p><strong>Reasoning:</strong> ff_h264_alloc_tables initializes slice_table_base with memset(base, 0xFFFFFFFF, size), filling each uint16_t slot with the sentinel value 0xFFFF. Per-macroblock, ff_h264_decode_mb_cabac writes <code>h-&gt;slice_table[mb_xy] = (sl_2-&gt;slice_num).w</code> — storing the current slice number as a 16-bit value. The slice_table is used for neighborhood queries: a read-back <code>slice_table[neighbor_mb] == slice_num</code> is used to determine if a neighbor MB belongs to the same slice. If a bitstream contains &gt;= 65535 slices (a pathological but spec-legal value), slice_num wraps to 0xFFFF on the 16-bit store. This collides with the sentinel, causing the equality check to return true for uninitialized (sentinel) entries, which would incorrectly classify out-of-bounds MBs as being in the same slice — potentially leading to incorrect CABAC context initialization indexing. No upper-bound guard on slice_num before truncation was found by Datalog. This class of bug (H.264 slice_table sentinel collision with 16-bit counter) was the root cause of CVE-2018-9841 in earlier FFmpeg versions.
+*</p>
+<h4 id="signed_integer_overflow_alloc_size-ff_h264_alloc_tables--0xb9556a"><strong>signed_integer_overflow_alloc_size</strong> <code>ff_h264_alloc_tables</code> @ 0xb9556a</h4>
+<p><strong>Evidence:</strong></p>
+<ul>
+<li>MLIL-SSA <code>0xb95564: rbp_1#2 = rbp#1 * mb_stride_1#1</code>  (int32 multiply: nb_slice_ctx * mb_stride)</li>
+<li>MLIL-SSA <code>0xb95567: rbp_2#3 = rbp_1#2 &lt;&lt; 4</code>             (int32 left-shift by 4, i.e. *16)</li>
+<li>MLIL-SSA <code>0xb9556a: nmemb_1#4 = sx.q(rbp_2#3)</code>         (sign-extend int32 result to int64)</li>
+<li>MLIL-SSA <code>0xb95570: av_calloc(nmemb_1#4, 1)</code>            (used directly as allocation size)</li>
+<li>LShlInAlloc.csv: <code>ff_h264_alloc_tables, addr=12146023</code> (0xb95567), dst=rbp_2#3, op=lsl, operand=4</li>
+<li>MulInAlloc.csv:  <code>ff_h264_alloc_tables, addr=12146020</code> (0xb95564), dst=rbp_1#2, op=mul, operand=mb_stride_1</li>
+<li>MulSxToAlloc.csv/LShiftSxToAlloc.csv: no direct match (operand chain was not directly sx'd in one step — BN decomposes it across two arith ops before sx.q)</li>
+</ul>
+<p><strong>Reasoning:</strong> In ff_h264_alloc_tables, the allocation size for intra4x4_pred_mode is computed as: <code>nmemb_1 = sx.q((nb_slice_ctx * mb_stride) &lt;&lt; 4)</code>. Both the multiply and left-shift operate on 32-bit signed integers before the sign-extension to 64-bit. For large dimensions (e.g. <code>nb_slice_ctx=256, mb_stride=8192</code> for a 4K-wide frame → 256<em>8192</em>16 = 33,554,432 which is within int32 range; but with mb_stride approaching H.264 spec max: mb_stride can be up to 128+1=129 for 4096-wide, times up to 256 thread contexts times 16 = 530,841,600, still within int32 positive range). The overflow would require very large <code>nb_slice_ctx</code> AND <code>mb_stride</code> simultaneously. The check in ff_h264_decode_seq_parameter_set constrains mb_width to 1024 MBs (16384 pixels) but nb_slice_ctx is bounded by thread count. This remains plausible-unverified as exploitation requires specific thread-count + resolution combinations.
+<strong>Confidence:</strong> plausible-unverified</p>
+<h3 id="low">[LOW]</h3>
+<h4 id="narrow_store_without_upper_bound_guard-ff_h264_decode_mb_cavlc--0x1105a50"><strong>narrow_store_without_upper_bound_guard</strong> <code>ff_h264_decode_mb_cavlc</code> @ 0x1105a50</h4>
+<p><strong>Evidence:</strong></p>
+<ul>
+<li>CavlcStore16.csv: 20 narrow 16-bit stores in <code>ff_h264_decode_mb_cavlc</code> with variable widths 2-8</li>
+<li>GuardOnStore16Var.csv: only ne-0 guard on rdi_42#171 at 0x10f1b4e, NOT an upper-bound</li>
+<li>NarrowStore16WithWidth.csv row: <code>ff_h264_decode_mb_cavlc</code>, addr=17851639, val_var=rax_89#627, val_width=8 (8-bit stored to 16-bit slot — no overflow risk from this one)</li>
+<li>NarrowStore16WithWidth.csv row: <code>ff_h264_decode_mb_cavlc</code>, addr=17851001, val_var=rbx_8#135, val_width=4 (4-bit to 16-bit slot)</li>
+</ul>
+<p><strong>Reasoning:</strong> Multiple narrow stores in CAVLC decoding involve values smaller than 16-bit (4-bit, 8-bit) — these are benign truncations. The slice_num store pattern is the same as CABAC. The lack of upper-bound guards is structural.
+<strong>Confidence:</strong> plausible-unverified</p>
+<h2 id="hypotheses-considered">Hypotheses considered</h2>
+<pre class="hljs"><code><div>| # | Hypothesis | Verdict | Facts checked | MCP checked | Note |
+|---|---|---|---|---|---|
+| 1 | slice_table sentinel collision: slice_num &gt;= 0xFFFF causes false neighbor match | plausible-unverified | SentinelMemset.csv: 0xb956f6 memset with 0xFFFFFFFF confirmed, Uint16AllocSite.csv: 5 uint16_t alloc sites including slice_table_base at 0xb955b0, MLIL-SSA 0xb956c3: rsi_1#1 = 0xffffffff, CabacStore16.csv: 33 stores, NarrowStore16WithWidth — all width=2 (already 16-bit vars), GuardOnStore16Var.csv: only 1 guard = ne-0, NO upper bound on slice_num before write, decompile_function(ff_h264_decode_mb_cabac) 0x125bd84: slice_table write confirmed, decompile_function(ff_h264_decode_mb_cabac) 0x125ce42: sentinel equality check confirmed | decompile_function(ff_h264_alloc_tables) — confirmed uint16_t alloc + memset(0xFFFFFFFF), decompile_function(ff_h264_decode_mb_cabac) — confirmed slice_table[mb_xy]=(slice_num).w write and slice_table[neighbor]==slice_num read-back | Structural sentinel-collision shape present; exploitation requires bitstream with &gt;=65535 slices. No guard refutes this. NOT confirmed exploitable in this build without dynamic tracing. |
+| 2 | signed int32 overflow in (nb_slice_ctx * mb_stride &lt;&lt; 4) before sx.q alloc-size | plausible-unverified | MulInAlloc.csv: 0xb95564 mul nb_slice_ctx*mb_stride (int32), LShlInAlloc.csv: 0xb95567 lsl *16 (int32), MLIL-SSA 0xb9556a: sx.q(rbp_2#3) then passed to av_calloc, LShiftSxToAlloc.csv: no match (multi-step chain not captured by single-step rule) | get_il(ff_h264_alloc_tables, mlil, ssa=True) — confirmed full arithmetic chain, decompile_function(ff_h264_alloc_tables) — nmemb_1 = sx.q((nb_slice_ctx*mb_stride)&lt;&lt;4) | Overflow requires nb_slice_ctx * mb_stride * 16 &gt; INT32_MAX. mb_stride max ~1025, nb_slice_ctx bounded by thread count (typically &lt;= 64). Max plausible: 64*1025*16 = 1,049,600 — far from INT32_MAX (2.1B). Likely safe in practice without extremely high thread counts. |
+| 3 | rax_329/r9_64 motion vector stores are NOT sentinel-collision candidates | refuted | Rax329Arith.csv: rax_329#250 = rax_328#249.w + rbp_10 — MV delta accumulation (int16 add), R9_64Arith.csv: r9_64#49 = r8_46#65 + r9_63#48.r9w — MV component add, decompile_function(ff_h264_decode_mb_cabac) 0x125e9f5: r9_64 = rax_327.w + var_e0.w — motion vector X, decompile_function(ff_h264_decode_mb_cabac) 0x125e9f8: rax_329 = rax_328.w + rbp_10 — motion vector Y | decompile_function(ff_h264_decode_mb_cabac) — confirmed rax_329/r9_64 are mv_cache stores, not slice_table | These are motion vector components stored to mv_cache[]. The stores to mv_cache are expected int16 operations. The 33 CabacStore16 entries are mostly mv_cache stores, not slice_table writes. |
+| 4 | cbp_table store of var_130_1.w — could be wide value narrowed | plausible-unverified | CabacStore16.csv: addr=19252805, var=rdx_47#57, width=2, decompile_function 0x125c29d: cbp_table_1[rax_7] = var_130_1.w — CBP truncated to 16-bit, No guard found on var_130_1 before the 16-bit store | decompile_function(ff_h264_decode_mb_cabac) | var_130_1 is the coded block pattern, max value 0x30 for 4:2:0. Cannot overflow 16-bit. Safe. |
+</div></code></pre>
+<h2 id="notes">Notes</h2>
+<h2 id="analysis-summary">Analysis Summary</h2>
+<h3 id="methodology">Methodology</h3>
+<p>Full batch fact extraction of 12 H.264 core functions (97K facts). Custom Datalog queries for: sentinel-init detection (<code>CallArgConst</code> on <code>memset</code>), uint16_t alloc sites (<code>AllocSite</code> with <code>elem_width=2</code>), narrow 16-bit stores with no upper-bound guards, arithmetic chain before <code>sx.q</code> alloc sizes.</p>
+<h3 id="key-findings">Key Findings</h3>
+<h4 id="finding-1-slice_table-sentinel-collision-shape-medium-plausible-unverified">Finding 1: slice_table Sentinel Collision Shape (Medium, Plausible-Unverified)</h4>
+<p><strong>The classic H.264 slice_table bug pattern is structurally present in this binary.</strong></p>
+<p>Data flow:</p>
+<pre class="hljs"><code><div>ff_h264_alloc_tables:
+  0xb955b0: slice_table_base = av_calloc(mb_stride+nmemb, 2)  // uint16_t[]
+  0xb956f6: memset(slice_table_base, 0xFFFFFFFF, size)         // every uint16_t = 0xFFFF sentinel
+  0xb9571b: h-&gt;slice_table = &amp;slice_table_base[mb_stride*2+1] // offset past guard row
+
+ff_h264_decode_mb_cabac:
+  0x125bd84: h-&gt;slice_table[mb_xy] = (sl-&gt;slice_num).w        // WRITE: truncate slice_num to uint16_t
+  0x125c645: h-&gt;slice_table[mb_xy] = (sl-&gt;slice_num).w        // WRITE: skipped MB path
+  0x125ce42: slice_table[neighbor_mb] == sl-&gt;slice_num         // READ-BACK equality check
+  0x125befc: slice_table[neighbor_mb] == sl-&gt;slice_num         // READ-BACK in MBAFF path
+</div></code></pre>
+<p>The invariant is: <code>slice_num</code> must never equal <code>0xFFFF</code> (the sentinel). If a bitstream encodes ≥65535 slices, <code>(slice_num).w == 0xFFFF</code> collides with the sentinel, causing uninitialized neighbor MBs to appear &quot;in the same slice&quot;. This would corrupt CABAC context initialization (<code>cabac_state[(zx.q(rax_122.b) &amp; ...)  + ...]</code>) with out-of-bounds MB type reads.</p>
+<p><strong>Datalog evidence:</strong> 0 upper-bound guards found on the slice_num variable in any version across the 33 CABAC 16-bit store sites (GuardOnStore16Var.csv shows only 1 ne-0 guard, unrelated to slice_num). This was the shape of CVE-2018-9841. Whether this specific build includes a fix at a higher level (e.g., in <code>h264_slice_header_init</code> capping slice group count) requires further tracing — <code>inconclusive</code>.</p>
+<h4 id="finding-2-signed-int32-overflow-in-nmemb-computation-low-risk">Finding 2: Signed Int32 Overflow in nmemb Computation (Low Risk)</h4>
+<pre class="hljs"><code><div>ff_h264_alloc_tables:
+  0xb95564: rbp_1 = nb_slice_ctx * mb_stride    // int32 multiply
+  0xb95567: rbp_2 = rbp_1 &lt;&lt; 4                  // int32 shift-by-16
+  0xb9556a: nmemb_1 = sx.q(rbp_2)               // sign-extend THEN alloc
+  0xb95570: av_calloc(nmemb_1, 1)
+</div></code></pre>
+<p>The overflow requires <code>nb_slice_ctx * mb_stride * 16 &gt; 2^31</code>. With typical thread bounds (≤64 threads) and H.264 max width (~1025 mb_stride), max is ~1M — safe. Only exploitable with abnormally large thread pool configs.</p>
+<h4 id="finding-3-motion-vector-stores-are-benign-refuted">Finding 3: Motion Vector Stores Are Benign (Refuted)</h4>
+<p>The 33 <code>CabacStore16</code> entries are dominated by <code>mv_cache</code> stores (motion vectors), which are expected int16_t operations. The <code>rax_329/r9_64</code> variables are motion vector delta additions — not overflow candidates.</p>
+<h3 id="what-would-confirm-finding-1">What Would Confirm Finding 1</h3>
+<p>To confirm the sentinel collision:</p>
+<ol>
+<li>Verify whether <code>ff_h264_decode_seq_parameter_set</code> or <code>h264_slice_header_init</code> enforces <code>slice_num &lt; 0xFFFF</code> at the bitstream parse level.</li>
+<li>Trace the source of <code>slice_num</code> — it increments per-slice in <code>h264_slice_header_init</code>. If the NAL parser allows &gt;65534 slices before a reset, the condition can be reached.</li>
+<li>Craft a bitstream with <code>num_slice_groups_minus1 = 65534</code> and verify runtime behavior.</li>
+</ol>
+
+</body>
+</html>

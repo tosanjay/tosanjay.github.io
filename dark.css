@@ -45,3 +45,40 @@ table tr:hover { background-color: #1c2128 !important; }
 
 /* Horizontal rules */
 hr { border-color: #30363d !important; }
+
+/* ── Responsive / device-friendly ── */
+
+/* Wrap wide tables and pre blocks so they scroll horizontally
+   instead of overflowing off-screen on phones */
+pre, table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Comfortable max reading width on large screens */
+body {
+  max-width: 860px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+}
+
+/* Tablet (≤768px) */
+@media (max-width: 768px) {
+  body { font-size: 15px !important; }
+  h1   { font-size: 1.5rem !important; }
+  h2   { font-size: 1.25rem !important; }
+  h3   { font-size: 1.1rem !important; }
+  pre  { font-size: 0.82rem !important; }
+}
+
+/* Phone (≤480px) */
+@media (max-width: 480px) {
+  body { font-size: 14px !important; padding-left: 0.9rem !important; padding-right: 0.9rem !important; }
+  h1   { font-size: 1.3rem !important; }
+  pre  { font-size: 0.78rem !important; }
+  /* Make table cells wrap text instead of forcing wide layout */
+  table th, table td { white-space: normal !important; font-size: 0.8rem !important; }
+}

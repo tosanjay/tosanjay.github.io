@@ -5,6 +5,12 @@ date: 2026-04-21
 
 # FFmpeg H.264 Decoder — slice_table Sentinel Collision & Alloc-Size Signed-Overflow Review
 
+## Introduction
+
+In April 2026, Anthropic published a [detailed report](https://red.anthropic.com/2026/mythos-preview/) on the cybersecurity capabilities of their Claude Mythos Preview model. Among its findings was a 16-year-old vulnerability in FFmpeg's H.264 decoder — a `slice_table` sentinel collision bug introduced as far back as a 2003 commit and turned into an exploitable condition in a 2010 refactor ([patch](https://code.ffmpeg.org/FFmpeg/FFmpeg/pulls/22499/files)). The bug had evaded every fuzzer and human code reviewer for over a decade. Shortly after, several other research teams and tool authors demonstrated that their own LLM-assisted tools could independently rediscover the same vulnerability — without Mythos. Those efforts, including Anthropic's own, were exclusively based on **source code analysis**: the LLM read and reasoned over C source files directly.
+
+I went through the same exercise first using **NeuroLog**, my source-code-level LLM analysis pipeline — that report is [published here](https://tosanjay.github.io/posts/ffmpeg_h264_vuln_report.html). The natural next question was: can we find the same bug starting entirely from a **compiled binary**, without source code? That is what **BinCodeQL** is designed for. BinCodeQL combines static binary analysis (via Binary Ninja) with a Datalog fact engine and an LLM reasoning layer. In the first analysis attempt, the tool identified a related finding but could not fully connect the dots — some Datalog rules needed to bridge the `slice_num` counter, the uint16_t store, and the sentinel-init pattern were too generic and missed the multi-step chain. I improved the rulebase with more fine-grain, but still generic rules and ran the analysis again. This report is the result of that second run. The entire analysis was driven by Claude Sonnet 4.6 with a budget under $12, prompted with nothing more specific than: *"look for memory corruption bugs — integer overflow, signed casting, unbounded access — in H.264-related functionality."*
+
 ## Metadata
 
 - **binary:** `/media/sanjay/f574986f-8197-4e72-a69d-87ddf200a6a9/sanjay/tools/ffmpeg-8.0.1/ffmpeg_g.bndb`
