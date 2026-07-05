@@ -229,10 +229,10 @@ footer h2{font-size:24px; margin-bottom:14px}
   </div>
 
   <div class="ticker rv">
-    <div class="cell"><div class="v" data-count="41" data-suf="×">0×</div><div class="l">libpng state-space</div><div class="s">chunk-sequence diversity vs plain AFL</div></div>
-    <div class="cell"><div class="v" data-count="30.9" data-suf="×">0×</div><div class="l">autonomy closure</div><div class="s">loop reaches the rich annotation itself</div></div>
-    <div class="cell"><div class="v" data-count="11.5" data-suf="×">0×</div><div class="l">vTPM, 12h real-target</div><div class="s">command sequences vs plain</div></div>
-    <div class="cell"><div class="v" data-count="2" data-suf="">0</div><div class="l">LLM calls / decision</div><div class="s">diagnose · annotate — rest is code</div></div>
+    <div class="cell"><div class="v" data-count="41" data-suf="×">41×</div><div class="l">libpng state-space</div><div class="s">chunk-sequence diversity vs plain AFL</div></div>
+    <div class="cell"><div class="v" data-count="30.9" data-suf="×">30.9×</div><div class="l">autonomy closure</div><div class="s">loop reaches the rich annotation itself</div></div>
+    <div class="cell"><div class="v" data-count="11.5" data-suf="×">11.5×</div><div class="l">vTPM, 12h real-target</div><div class="s">command sequences vs plain</div></div>
+    <div class="cell"><div class="v" data-count="1" data-suf="">1</div><div class="l">LLM call / decision</div><div class="s">diagnose · annotate — rest is code</div></div>
   </div>
   <p class="loopnote" style="margin-top:14px">A research log + reproducible evaluation. Built on <a href="https://github.com/RUB-SysSec/ijon" target="_blank" rel="noopener">IJON</a> (Aschermann et al., S&amp;P 2020) and <a href="https://github.com/AFLplusplus/AFLplusplus" target="_blank" rel="noopener">AFL++</a>.</p>
 </div></header>
@@ -242,7 +242,7 @@ footer h2{font-size:24px; margin-bottom:14px}
   <span class="tag">01 · THE WALL</span>
   <h2>Edge coverage is blind to <span class="hl">state</span>.</h2>
   <p>AFL keeps an input when it lights up a <b>new edge</b>. But solve a maze, play a level, or match a checksum and the <i>same</i> edges run regardless of how close you are to the goal — moving the player, or getting the bytes "warmer", produces no new feedback. The fuzzer has no gradient to climb, and the campaign stalls forever.</p>
-  <p>IJON's insight: let an analyst expose the hidden state to the fuzzer with a tiny source annotation — <code>IJON_SET(hash(x,y))</code> on the player's position, <code>IJON_MAX(progress)</code>, <code>IJON_CMP(a,b)</code>. With one line, AFL solves problems that defeat every automated tool.</p>
+  <p>IJON's insight: let an analyst expose the hidden state to the fuzzer with a tiny source annotation — <code>IJON_SET(hash(x,y))</code> on the player's position, <code>IJON_MAX(progress)</code>, <code>IJON_CMP(a,b)</code>. With one line, AFL solves problems that stump conventional coverage-guided fuzzers.</p>
   <p><b>The bottleneck is the human.</b> Someone must read the code, read the fuzzer's progress, diagnose <i>why</i> it's stuck, pick the right primitive, and place it correctly. The IJON authors flag automating this as future work — and note they "typically had very limited understanding of the target." That's the gap we close.</p>
 </div></section>
 
@@ -276,7 +276,7 @@ footer h2{font-size:24px; margin-bottom:14px}
   <div class="roadmap rv">
     <span class="rmlbl">▸ v2.0 · ROADMAP — TWO DEEPER LOCALIZATION AXES</span>
     <p><b>(a) Branch-level localization (dataflow to a gating branch).</b> v1 (this release) finds the missing edge A→B but not <i>why</i> — when the blocker lives inside a <i>covered</i> intermediate function (<code>X(); Y(); if (Z()==ok) B();</code>) it shows the model <code>if (Z()==ok)</code> and stops, because X/Y/Z ran. v2 will go from <i>which functions ran</i> to <i>which <b>branch</b> didn't</i>: keep llvm-cov's per-branch coverage + a backward slice from the gating condition, so the agent can pinpoint a blocker buried <b>2–3 covered functions deep</b> — the X·Y·Z case.</p>
-    <p style="margin-top:13px"><b>(b) Class-2 loop / state-site localization.</b> v1's localizer is coverage-<i>frontier</i> oriented — it finds <i>uncovered</i> code to reach (great for class-3 breadth). But class-2 depth — exploring the <i>orderings</i> of operations — lives in <b>covered</b> code: the dispatch loop where state accumulates. The frontier never surfaces it, so the sequence annotation falls back to the nearest visible loop — often the <b>harness</b>, where only raw bytes are in scope. On libtpms that's exactly the split: the class-3 annotation landed semantically in the library (<code>IJON_SET(command.index)</code>), but the class-2 sequence annotation became a raw-byte hash in the harness. v2 adds a <b>class-2 localizer</b> to find the covered loop and the state variable carried across iterations (e.g. <code>command-&gt;index</code>), placing the sequence annotation at the semantic library site. <i>We wanted (b) in v1.0; both deferred so v1 ships first.</i></p>
+    <p style="margin-top:13px"><b>(b) Sequence-loop / state-site localization.</b> v1's localizer is coverage-<i>frontier</i> oriented — it finds <i>uncovered</i> code to reach (great for breadth — reaching new code). But sequence depth — exploring the <i>orderings</i> of operations — lives in <b>covered</b> code: the dispatch loop where state accumulates. The frontier never surfaces it, so the sequence annotation falls back to the nearest visible loop — often the <b>harness</b>, where only raw bytes are in scope. On libtpms that's exactly the split: the reach-new-code annotation landed semantically in the library (<code>IJON_SET(command.index)</code>), but the sequence annotation became a raw-byte hash in the harness. v2 adds a <b>sequence localizer</b> to find the covered loop and the state variable carried across iterations (e.g. <code>command-&gt;index</code>), placing the sequence annotation at the semantic library site. <i>We wanted (b) in v1.0; both deferred so v1 ships first.</i></p>
   </div>
 </div></section>
 
@@ -330,8 +330,8 @@ footer h2{font-size:24px; margin-bottom:14px}
       <tr><td class="t">libtpms (vTPM)<br><span style="color:var(--faint);font-size:12px">12h, real target</span></td><td>two autonomous annotations (sequence × command-type).</td><td><span class="big">11.5×</span><sup style="color:var(--cyan)">*</sup> command sequences; 7× command types; 0 bugs.</td><td><span class="verdict v-neg">no bug · big Δ</span></td></tr>
     </tbody>
   </table></div>
-  <p class="loopnote">On <b>libtpms</b> the gap <i>widened</i> with time — plain AFL flat-lined at ~820 distinct command sequences (8h and 12h identical) while IJON climbed from 4,950 to <b class="lime">9,461</b>. State-guided exploration <b>compounds</b>; it isn't a one-shot boost. No latent bug fell out — expected on a target OSS-Fuzz hammers continuously.</p>
-  <p class="loopnote" style="font-size:12.5px;color:var(--faint)"><sup style="color:var(--cyan)">*</sup> <b>Conservative — known headroom.</b> The class-3 annotation landed semantically in the library (<code>IJON_SET(command.index)</code> in <code>ExecCommand.c</code>), but the class-2 <i>sequence</i> annotation fell back to a raw-byte prefix hash in the harness rather than the command-index sequence at the library's dispatch loop — v1's localizer is coverage-frontier oriented and has no class-2 loop-localization yet (see the <a href="#how">v2.0 roadmap</a>). A sharper semantic class-2 site should only raise this gap.</p>
+  <p class="loopnote">On <b>libtpms</b> the gap <i>widened</i> with time — plain AFL flat-lined at ~820 distinct command sequences (8h and 12h identical) while IJON climbed from 4,950 to <b class="lime">9,461</b>. State-guided exploration <b>keeps pulling ahead</b>; it isn't a one-shot boost. No latent bug fell out — expected on a target OSS-Fuzz hammers continuously.</p>
+  <p class="loopnote" style="font-size:12.5px;color:var(--faint)"><sup style="color:var(--cyan)">*</sup> <b>Conservative — known headroom.</b> The reach-new-code annotation landed semantically in the library (<code>IJON_SET(command.index)</code> in <code>ExecCommand.c</code>), but the <i>sequence</i> annotation fell back to a raw-byte prefix hash in the harness rather than the command-index sequence at the library's dispatch loop — v1's localizer is coverage-frontier oriented and has no sequence-loop localization yet (see the <a href="#how">v2.0 roadmap</a>). A sharper semantic sequence site should only raise this gap.</p>
 </div></section>
 
 <!-- INSIGHT -->
@@ -354,7 +354,7 @@ footer h2{font-size:24px; margin-bottom:14px}
     <div class="neg"><h4>Mario: demo, not a measurement</h4><p>We don't report a Mario effectiveness A/B. Its <code>world_pos</code> partly leaks into coverage (so it's a poor place to <i>measure</i> IJON), and our control build didn't cleanly exclude the annotation — so we withdrew the comparison rather than report an unreliable tie. The blind annotation + playthrough stand as a demo.</p></div>
     <div class="neg"><h4>libpng bug-hunt: clean miss</h4><p>Recent libpng CVEs are <i>format-gated</i> (16-bit interlaced, palette+gamma), not CRC-gated. Coverage data refuted our CRC hypothesis. IJON-on-CRC was the wrong tool — honestly recorded.</p></div>
     <div class="neg"><h4>libtpms: 12h, zero crashes</h4><p>No new bug on an OSS-Fuzz-hardened target — the expected long shot. The reliable win is the deployment + the 11.5× state expansion, not a CVE.</p></div>
-    <div class="neg"><h4>Class-2 crash auto-solve: the 1-D wall</h4><p>No 1-D synthetic target both defeats plain AFL <i>and</i> is IJON-climbable. The paper measures class-2 by sequence diversity, not crashes — which is what we demonstrate.</p></div>
+    <div class="neg"><h4>Sequence-class crash auto-solve: the 1-D wall</h4><p>No 1-D synthetic target both defeats plain AFL <i>and</i> is IJON-climbable. The paper measures this class by sequence diversity, not crashes — which is what we demonstrate.</p></div>
   </div>
   <h3>The fairness gate</h3>
   <p>Each benchmark ships the ground-truth annotation behind <code>#ifdef</code>. Before the agent ever sees the source we strip the annotation, redact every line mentioning <code>ijon</code> (leaky comments, prototypes), and <b>hard-assert no <code>ijon</code> token survives</b>. The model knows the IJON <i>API and taxonomy</i> legitimately, from its own prompt — it is never handed the specific answer. (Our first checksum run "passed" only because a comment named the fix; we caught it and re-ran.)</p>
@@ -382,7 +382,7 @@ footer h2{font-size:24px; margin-bottom:14px}
     </div>
     <div><b>Analyst model</b>
       <span style="color:var(--faint)">DeepSeek V4 Pro (reasoning)</span>
-      <span style="color:var(--faint)">~2 LLM calls / decision</span>
+      <span style="color:var(--faint)">1 analyst call / decision (+ repair on build errors)</span>
     </div>
   </div>
   <p class="ack"><span class="lbl">ACKNOWLEDGEMENT</span>Developed with <b>Claude Code</b> + <b>Opus</b>.</p>
