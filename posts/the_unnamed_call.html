@@ -284,7 +284,7 @@
 
     <h2>What the plugin actually does</h2>
 
-    <p>The library I was looking at is an Android media extractor plugin. The structure is public, it is part of AOSP, so I can describe it honestly without naming the vendor build. The framework finds plugins in a directory, and for each one it does precisely this- <code>dlopen</code> the file, then <code>dlsym</code> for one symbol called <code>GETEXTRACTORDEF</code>. One name. That is the entire named relationship between the framework and the plugin. In the terms I used above, the framework is A and the plugin is B.</p>
+    <p>The library I was looking at is an Android media extractor plugin. The structure is public, it is part of AOSP, so we can describe it honestly without naming the vendor build. The framework finds plugins in a directory, and for each one it does precisely this- <code>dlopen</code> the file, then <code>dlsym</code> for one symbol called <code>GETEXTRACTORDEF</code>. One name. That is the entire named relationship between the framework and the plugin. In the terms we used above, the framework is A and the plugin is B.</p>
 
     <p>Here is what that one exported function decompiles to (vendor string elided):</p>
 
@@ -385,7 +385,7 @@
   <div class="col">
     <h2>What the tables say</h2>
 
-    <p>At this point I went and counted, because I wanted to know what a tool could possibly have seen, and the numbers turned out to be worth looking at.</p>
+    <p>At this point we went and counted, because we wanted to know what a tool could possibly have seen, and the numbers turned out to be worth looking at.</p>
   </div>
 
   <div class="facts col">
@@ -521,7 +521,7 @@
 
     <p>One more thing fell out of this, and it is the part that I think generalises furthest beyond my particular problem.</p>
 
-    <p>Our whole reachability layer is keyed on function <em>names</em>. You ask it what reaches <code>parse</code> and it answers. So I went and checked what a name actually identifies in this library, and the answer is that it does not identify very much at all.</p>
+    <p>Our whole reachability layer is keyed on function <em>names</em>. You ask it what reaches <code>parse</code> and it answers. So we went and checked what a name actually identifies in this library, and the answer is that it does not identify very much at all.</p>
   </div>
 
   <figure>
@@ -560,7 +560,7 @@
 
     <p>And here is the bit I found genuinely satisfying. Those 24 functions called <code>__invoke</code> are not badly named by accident. They are anonymous lambdas, and they were <em>never</em> given names, because the C++ that produced them never needed one.</p>
 
-    <p>I went and checked what the file itself carries, since the decompiler does print a long spelling for them. There is no <code>.symtab</code> and there are no debug sections, only a 192 entry <code>.dynsym</code>, and the text <code>__invoke</code> does not occur anywhere in the binary at all. So that long name is not being read out of any symbol the compiler left behind. What the file does carry is AOSP source paths and assertion text- <code>MPEG4Extractor.cpp:9273 CHECK(mBuffer != NULL) failed.</code> and 66 others like it- which is the <code>__PRETTY_FUNCTION__</code> material that the <code>CHECK</code> macros embed, and that is the only place in the whole file where such a signature exists. Meanwhile the record our own extractor writes for that address says plainly <code>name: "__invoke"</code>, the short form, and the short form is what the reachability layer then reads.</p>
+    <p>We went and checked what the file itself carries, since the decompiler does print a long spelling for them. There is no <code>.symtab</code> and there are no debug sections, only a 192 entry <code>.dynsym</code>, and the text <code>__invoke</code> does not occur anywhere in the binary at all. So that long name is not being read out of any symbol the compiler left behind. What the file does carry is AOSP source paths and assertion text- <code>MPEG4Extractor.cpp:9273 CHECK(mBuffer != NULL) failed.</code> and 66 others like it- which is the <code>__PRETTY_FUNCTION__</code> material that the <code>CHECK</code> macros embed, and that is the only place in the whole file where such a signature exists. Meanwhile the record our own extractor writes for that address says plainly <code>name: "__invoke"</code>, the short form, and the short form is what the reachability layer then reads.</p>
 
     <p>So the things handed across the library boundary have no usable names for the same reason that the handoff itself has no symbol- nobody ever had to say them out loud. An address is the only identity these functions have ever had.</p>
 
@@ -651,7 +651,7 @@ liboffsetcur = int(libfd_mm[:18],0)</code></pre>
 
     <p>The address is not a call target at all, it is a <em>frame of reference</em>. The weights were computed against one load base, so if ASLR has moved the library then every basic-block address in the table is meaningless, and the honest thing to do is to refuse the run. Which means the two cases break an analysis in quite different ways- in the plugin, a missing address costs you a control-flow edge, whereas here it would cost you the correspondence between a static address space and a running one.</p>
 
-    <p>And that is the naming lesson arriving from the other side. An address is an identity only relative to a base, and we had to learn it again in our own crash attribution work, wherein a sanitizer report hands you a module and an offset and that has to be mapped back to a link-time address before it names any function at all. I had already solved that once with an 18 byte file and a <code>die()</code>, and then met it again from the opposite end, as the person trying to recover somebody else's channel rather than the person building his own.</p>
+    <p>And that is the naming lesson arriving from the other side. An address is an identity only relative to a base, and we had to learn it again in our own crash attribution work, wherein a sanitizer report hands you a module and an offset and that has to be mapped back to a link-time address before it names any function at all. I had already solved that once with an 18 byte file and a <code>die()</code>, and then met it again from the opposite end, as the person trying to recover somebody else's channel rather than the person building my own.</p>
 
     <p>So the family is wider than function pointers. It is any channel that carries an identity across a boundary that nothing resolves- a shared mapping, shared memory, a pipe or a socket, an environment variable, <code>/proc</code>, a config file naming a symbol, a serialised callback id, an RPC handle. Every one of them creates a coupling which is real, load bearing, and in no table.</p>
 
