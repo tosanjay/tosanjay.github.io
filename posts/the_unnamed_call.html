@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="How two shared libraries actually talk to each other at runtime, why a function pointer handed across a .so boundary leaves no symbol behind, and the exact point where a static call graph gives up." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>The Unnamed Call</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+  /* --- standalone shell: what the host page used to provide --- */
+  *, *::before, *::after { box-sizing: border-box; }
+  :root { color-scheme: light; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+  .sitenav { padding-block: 1.75rem 0; font-family: var(--font-mono); font-size: 0.8rem; }
+  .sitenav a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--rule); }
+  .sitenav a:hover { color: var(--named); border-color: var(--named); }
+  .sitenav + header.masthead { padding-block: 1.5rem 2.25rem; }
+
+  /* Layout: one reading column at ~66ch, figures allowed to break wider; colour encodes the
+     two mechanisms (steel = resolved by name, rust = raw address) and nothing else. */
+  :root {
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --fg: #15171d;
+    --muted: #596070;
+    --rule: #d6dae1;
+    --named: #2d5a86;
+    --unnamed: #a2512a;
+    --code-bg: #eceef2;
+    --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-head: "IBM Plex Serif", Georgia, serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111319;
+      --surface: #181b22;
+      --fg: #e4e7ec;
+      --muted: #98a0ae;
+      --rule: #282d38;
+      --named: #7eadda;
+      --unnamed: #dd8e60;
+      --code-bg: #1e222b;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111319;
+    --surface: #181b22;
+    --fg: #e4e7ec;
+    --muted: #98a0ae;
+    --rule: #282d38;
+    --named: #7eadda;
+    --unnamed: #dd8e60;
+    --code-bg: #1e222b;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 1.0625rem;
+    line-height: 1.68;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 4rem;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 50rem; margin: 0 auto; }
+  .col { max-width: 36rem; }
+
+  header.masthead { padding-block: 3.5rem 2.25rem; border-bottom: 1px solid var(--rule); margin-bottom: 2.5rem; }
+  .kicker {
+    font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 1rem;
+  }
+  h1 {
+    font-family: var(--font-head); font-weight: 600; font-size: clamp(2.1rem, 7vw, 3.1rem);
+    line-height: 1.1; letter-spacing: -0.015em; margin: 0 0 0.75rem; text-wrap: balance;
+  }
+  .standfirst {
+    font-size: clamp(1.05rem, 3vw, 1.2rem); color: var(--muted); margin: 0; max-width: 34rem;
+    text-wrap: pretty;
+  }
+
+  h2 {
+    font-family: var(--font-head); font-weight: 600; font-size: clamp(1.4rem, 4.5vw, 1.75rem);
+    line-height: 1.22; margin: 3.25rem 0 1rem; text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--font-body); font-weight: 600; font-size: 1.0625rem;
+    margin: 2rem 0 0.4rem;
+  }
+  p { margin: 0 0 1.15rem; }
+  a { color: var(--named); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  strong { font-weight: 600; }
+  code {
+    font-family: var(--font-mono); font-size: 0.88em;
+    background: var(--code-bg); padding: 0.1em 0.32em; border-radius: 2px;
+  }
+  .named { color: var(--named); font-weight: 500; }
+  .unnamed { color: var(--unnamed); font-weight: 500; }
+
+  pre {
+    font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+    background: var(--code-bg); border: 1px solid var(--rule); border-left: 3px solid var(--unnamed);
+    padding: 1rem 1.1rem; overflow-x: auto; margin: 0 0 0.6rem; min-width: 0;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+  .cmt { color: var(--muted); }
+
+  figure { margin: 2rem 0 2.25rem; }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; color: var(--fg); }
+  .figscroll { overflow-x: auto; min-width: 0; }
+  figcaption {
+    font-size: 0.875rem; color: var(--muted); margin-top: 0.85rem;
+    padding-left: 0.9rem; border-left: 2px solid var(--rule); max-width: 34rem;
+  }
+  .fignum { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--muted); }
+
+  .facts {
+    background: var(--surface); border: 1px solid var(--rule); padding: 1.25rem 1.4rem;
+    margin: 2rem 0; font-size: 0.9375rem;
+  }
+  .facts h3 { margin-top: 0; }
+  .facts dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1.1rem; }
+  .facts dt { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+  .facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  .aside {
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    padding-block: 1.1rem; margin: 2.25rem 0; font-size: 0.9375rem; color: var(--muted);
+  }
+  .aside p:last-child { margin-bottom: 0; }
+
+  ul { margin: 0 0 1.15rem; padding-left: 1.2rem; }
+  li { margin-bottom: 0.4rem; }
+
+  .pull {
+    font-family: var(--font-head); font-size: clamp(1.15rem, 3.6vw, 1.5rem); line-height: 1.34;
+    color: var(--unnamed); margin: 2.25rem 0; padding-left: 1.1rem;
+    border-left: 3px solid var(--unnamed); max-width: 30rem; text-wrap: balance;
+  }
+  .signoff {
+    font-family: var(--font-head); font-size: 1.25rem; margin: 2.5rem 0 0;
+    padding-top: 1.75rem; border-top: 1px solid var(--rule);
+  }
+  .byline { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); margin-top: 1.5rem; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="sitenav"><a href="/">&#8592; Sanjay's Research Home</a></nav>
+
+  <header class="masthead">
+    <p class="kicker">Notes on binary analysis &#183; 24.11.2026</p>
+    <h1>The Unnamed Call</h1>
+    <p class="standfirst">How two shared libraries actually talk to each other, and the exact point where a call graph quietly gives up.</p>
+  </header>
+
+  <div class="col">
+    <p>Last week I was hunting bugs in a stripped aarch64 media plugin and our pipeline kept reporting something that could not possibly be right. Every ranked function had zero reaching entries. Not a few of them. All of them.</p>
+
+    <p>My first guess was a bug in our own reachability code, because that is usually the right guess. It was not a bug. The library honestly had no entry points that our analysis could see, and working out why took me back through the question of how two shared libraries actually talk to each other at runtime. I thought I knew this one well, and it turned out that I knew only the easy half of it.</p>
+
+    <p>So these are my notes, written while they are still fresh. If you work on binary analysis, or you teach a systems course and want a concrete reason why static analysis is hard, I think there is something useful here.</p>
+
+    <h2>Two ways to run somebody else's code</h2>
+
+    <p>If library A ends up executing a function that lives in library B, there are exactly two ways that could have happened. I had always known both of them, and I had just never had to care about the difference until this week.</p>
+
+    <h3>By name</h3>
+    <p>A referred to B's function by its name, which means that either the compiler saw a declaration in a header and the linker recorded the dependency, or the program called <code>dlopen</code> and then <code>dlsym("foo")</code> at runtime. The route differs but the essential thing is the same in both cases- <span class="named">a name gets resolved</span>, and somebody has to do the resolving. That somebody is the dynamic linker.</p>
+    <p>And because the linker has to do work, the work leaves evidence sitting in the file: an undefined symbol in <code>.dynsym</code>, a <code>DT_NEEDED</code> entry naming the library, a PLT stub, a relocation, and our tooling reads all of it, so this is the comfortable case.</p>
+
+    <h3>By address</h3>
+    <p>B handed A a number, which is to say that B stored the address of one of its own functions into a piece of memory, and A later read that number and called it. The roles are exactly as before- A is still the one doing the calling, and B still owns the code that ends up running.</p>
+    <p>That is the whole mechanism. <span class="unnamed">Nothing is resolved</span>, because there is no name to resolve. The dynamic linker is not involved at all- it has nothing to do, and it never learns that the relationship exists. No undefined symbol, no relocation, no PLT entry, nothing in any table. The only trace anywhere is a single store instruction inside B.</p>
+  </div>
+
+  <figure>
+    <div class="figscroll">
+      <svg viewBox="0 0 720 470" role="img" aria-label="Two diagrams. In the first, library A asks the dynamic linker to resolve the name foo, the linker finds it in library B, and A then calls B through the PLT, leaving a symbol, a DT_NEEDED entry, a PLT stub and a relocation behind. In the second, library B stores the address of its own function into a struct in memory, library A reads that word and calls it, so the call runs in the same direction as before but no name is resolved and nothing is recorded; the only trace is one store instruction inside B.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="arN" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#2d5a86"/>
+          </marker>
+          <marker id="arU" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a2512a"/>
+          </marker>
+        </defs>
+
+        <!-- ROW 1 : by name -->
+        <text x="0" y="14" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.4" fill="#2d5a86">CROSSING BY NAME</text>
+
+        <rect x="0" y="92" width="150" height="54" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="75" y="117" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="500" fill="currentColor">library A</text>
+        <text x="75" y="133" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">the caller</text>
+
+        <rect x="275" y="34" width="170" height="50" rx="2" fill="none" stroke="#2d5a86" stroke-width="1.8"/>
+        <text x="360" y="56" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="#2d5a86">dynamic linker</text>
+        <text x="360" y="72" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#2d5a86" opacity="0.8">resolves the name</text>
+
+        <rect x="570" y="92" width="150" height="54" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="645" y="117" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="500" fill="currentColor">library B</text>
+        <text x="645" y="133" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">defines foo</text>
+
+        <line x1="152" y1="100" x2="273" y2="68" stroke="#2d5a86" stroke-width="1.5" marker-end="url(#arN)"/>
+        <text x="196" y="74" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2d5a86">needs "foo"</text>
+
+        <line x1="447" y1="68" x2="568" y2="100" stroke="#2d5a86" stroke-width="1.5" marker-end="url(#arN)"/>
+        <text x="492" y="74" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2d5a86">finds "foo"</text>
+
+        <line x1="152" y1="128" x2="568" y2="128" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="360" y="122" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor">call foo@plt</text>
+
+        <text x="0" y="176" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity="0.75">Evidence left in the file:</text>
+        <text x="0" y="192" font-family="IBM Plex Mono, monospace" font-size="11" fill="#2d5a86">.dynsym entry &#183; DT_NEEDED &#183; PLT stub &#183; relocation</text>
+
+        <line x1="0" y1="228" x2="720" y2="228" stroke="currentColor" stroke-width="1" opacity="0.2"/>
+
+        <!-- ROW 2 : by address -->
+        <text x="0" y="262" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.4" fill="#a2512a">CROSSING BY ADDRESS</text>
+
+        <rect x="0" y="340" width="150" height="54" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="75" y="365" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="500" fill="currentColor">library A</text>
+        <text x="75" y="381" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">the caller</text>
+
+        <rect x="275" y="282" width="170" height="50" rx="2" fill="none" stroke="#a2512a" stroke-width="1.8" stroke-dasharray="5 3"/>
+        <text x="360" y="304" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="#a2512a">a struct in memory</text>
+        <text x="360" y="320" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#a2512a" opacity="0.85">holds one raw word</text>
+
+        <rect x="570" y="340" width="150" height="54" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="645" y="365" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="500" fill="currentColor">library B</text>
+        <text x="645" y="381" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">defines foo</text>
+
+        <line x1="273" y1="316" x2="152" y2="348" stroke="#a2512a" stroke-width="1.5" marker-end="url(#arU)"/>
+        <text x="172" y="322" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a2512a">reads the word</text>
+
+        <line x1="568" y1="348" x2="447" y2="316" stroke="#a2512a" stroke-width="1.5" marker-end="url(#arU)"/>
+        <text x="482" y="322" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a2512a">stores &amp;foo</text>
+
+        <line x1="152" y1="376" x2="568" y2="376" stroke="#a2512a" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arU)"/>
+        <text x="360" y="370" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a2512a">calls that address</text>
+
+        <text x="0" y="424" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity="0.75">Evidence left in the file:</text>
+        <text x="0" y="440" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2512a">one store instruction inside B. That is all.</text>
+        <text x="0" y="458" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.55">No symbol, no relocation, no PLT, no linker involvement.</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">FIG 1</span> &mdash; The same outcome, reached two ways, and the call runs A into B in both of them. Only the middle changes: a linker that resolves a name, or a struct that carries a number. The thing worth noticing is that the address has to travel <em>backwards</em> along the call, because B must hand it over before A is able to use it.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>The difference matters for exactly one reason. In the first case something resolved a name and the resolution is recorded. In the second case nothing was resolved, so there is nothing to record, and a tool that learns about the world by reading tables learns nothing at all.</p>
+
+    <h2>What the plugin actually does</h2>
+
+    <p>The library I was looking at is an Android media extractor plugin. The structure is public, it is part of AOSP, so I can describe it honestly without naming the vendor build. The framework finds plugins in a directory, and for each one it does precisely this- <code>dlopen</code> the file, then <code>dlsym</code> for one symbol called <code>GETEXTRACTORDEF</code>. One name. That is the entire named relationship between the framework and the plugin. In the terms I used above, the framework is A and the plugin is B.</p>
+
+    <p>Here is what that one exported function decompiles to (vendor string elided):</p>
+
+    <pre><code>void GETEXTRACTORDEF(undefined4 *param_1)
+{
+  *param_1 = 3;                                 <span class="cmt">/* def version */</span>
+  param_1[5] = 2;
+  *(char **)(param_1 + 6) = "... Extractor";    <span class="cmt">/* display name */</span>
+  *(code **)(param_1 + 8) = android::Sniff;     <span class="cmt">/* a function ADDRESS */</span>
+  *(undefined ***)(param_1 + 10) = &amp;PTR_DAT_001640e0;  <span class="cmt">/* a TABLE address */</span>
+  return;
+}</code></pre>
+
+    <p>Look at what this function does, and more importantly at what it does not do. It <em>does not call anything.</em> It writes five words into a struct that the caller allocated and passed in, two of those words are addresses of code, and then it returns.</p>
+
+    <p>So when the framework calls those addresses later, it is calling into the plugin along a path that the plugin never expressed as a call. Follow the table address and you reach the factory, which is where it gets properly interesting:</p>
+
+    <pre><code>void android::CreateExtractor(undefined8 param_1)
+{
+  this   = operator_new(0x160);
+  puVar1 = operator_new(0x10);
+  *puVar1 = &amp;PTR__Box_001605b8;            <span class="cmt">/* install a vtable */</span>
+  puVar1[1] = param_1;
+  MPEG4Extractor::MPEG4Extractor(this,puVar1,(char *)0x0);
+  puVar1 = malloc(0x48);
+  *puVar1   = this;
+  puVar1[1] = wrap(...)::{lambda(void*)#1}::__invoke;
+  puVar1[2] = wrap(...)::{lambda(void*)#2}::__invoke;
+  puVar1[3] = wrap(...)::{lambda(void*,unsigned_long)#1}::__invoke;
+  <span class="cmt">/* ... and so on, eight of them */</span>
+}</code></pre>
+
+    <p>The factory allocates the C++ object, then builds a <em>second</em> struct full of lambda thunks that forward to that object's virtual methods, and hands that out. The framework never touches a vtable slot directly. It calls a thunk, the thunk calls the virtual method, and the virtual method is where the parsing code (and the bug) lives.</p>
+  </div>
+
+  <figure>
+    <div class="figscroll">
+      <svg viewBox="0 0 720 420" role="img" aria-label="A sequence diagram with the framework on the left and the plugin on the right. Step one, the framework dlopens the file. Step two, it dlsyms the single name GETEXTRACTORDEF; this is marked as the only name that crosses the boundary. Step three, it calls that function, which stores raw addresses into a struct. Step four, the framework calls the factory address. Step five, the factory returns a struct of thunk addresses. Step six, the framework calls a thunk, which reaches the virtual method and the parser. Steps three onward are marked as carrying addresses only.">
+        <defs>
+          <marker id="s1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="s2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a2512a"/>
+          </marker>
+          <marker id="s3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#2d5a86"/>
+          </marker>
+        </defs>
+
+        <text x="92" y="16" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="currentColor">framework</text>
+        <text x="92" y="31" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.6">another .so &#183; owns the dlopen</text>
+        <text x="596" y="16" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="currentColor">plugin</text>
+        <text x="596" y="31" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.6">the library we analyse</text>
+
+        <line x1="92" y1="42" x2="92" y2="400" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+        <line x1="596" y1="42" x2="596" y2="400" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+        <line x1="344" y1="42" x2="344" y2="400" stroke="currentColor" stroke-width="1" opacity="0.15" stroke-dasharray="3 5"/>
+        <text x="344" y="412" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.5">the .so boundary</text>
+
+        <line x1="94" y1="70" x2="594" y2="70" stroke="#2d5a86" stroke-width="1.5" marker-end="url(#s3)"/>
+        <text x="344" y="63" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#2d5a86">dlopen("lib....so")</text>
+
+        <line x1="94" y1="110" x2="594" y2="110" stroke="#2d5a86" stroke-width="2.2" marker-end="url(#s3)"/>
+        <text x="344" y="103" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="500" fill="#2d5a86">dlsym("GETEXTRACTORDEF")</text>
+        <text x="344" y="127" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10.5" fill="#2d5a86">the ONLY name that ever crosses</text>
+
+        <line x1="94" y1="166" x2="594" y2="166" stroke="currentColor" stroke-width="1.5" marker-end="url(#s1)"/>
+        <text x="344" y="159" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor">call it with &amp;def</text>
+
+        <line x1="594" y1="198" x2="94" y2="198" stroke="#a2512a" stroke-width="1.5" marker-end="url(#s2)"/>
+        <text x="344" y="191" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2512a">def.sniff = &amp;Sniff &#183; def.v = &amp;table</text>
+
+        <line x1="94" y1="240" x2="594" y2="240" stroke="#a2512a" stroke-width="1.5" marker-end="url(#s2)"/>
+        <text x="344" y="233" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2512a">call table[0]  &#8594;  CreateExtractor</text>
+
+        <line x1="594" y1="272" x2="94" y2="272" stroke="#a2512a" stroke-width="1.5" marker-end="url(#s2)"/>
+        <text x="344" y="265" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2512a">return &amp;{ obj, &amp;__invoke &#215;8 }</text>
+
+        <line x1="94" y1="314" x2="594" y2="314" stroke="#a2512a" stroke-width="1.5" marker-end="url(#s2)"/>
+        <text x="344" y="307" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2512a">call thunk[3]  (read)</text>
+
+        <rect x="500" y="330" width="192" height="52" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="596" y="350" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor">__invoke &#8594; vtable slot</text>
+        <text x="596" y="366" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor">&#8594; MPEG4Source::read</text>
+        <line x1="596" y1="316" x2="596" y2="328" stroke="currentColor" stroke-width="1.3" marker-end="url(#s1)"/>
+
+        <rect x="0" y="210" width="76" height="92" rx="2" fill="none" stroke="#a2512a" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="38" y="232" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#a2512a">addresses</text>
+        <text x="38" y="246" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#a2512a">only</text>
+        <text x="38" y="266" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#a2512a">from</text>
+        <text x="38" y="280" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#a2512a">here on</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">FIG 2</span> &mdash; The handshake in order. Exactly one name crosses the boundary, right at the top. Everything after that is raw addresses passed through data, which is why the interesting part of the relationship is invisible to anything that reads symbol tables.</figcaption>
+  </figure>
+
+  <div class="col">
+    <h2>What the tables say</h2>
+
+    <p>At this point I went and counted, because I wanted to know what a tool could possibly have seen, and the numbers turned out to be worth looking at.</p>
+  </div>
+
+  <div class="facts col">
+    <h3>What the library tells an analyst about itself</h3>
+    <dl>
+      <dt>exported symbols</dt><dd>2 <span style="color:var(--muted)">(<code>__cfi_check</code> and <code>GETEXTRACTORDEF</code>)</span></dd>
+      <dt>imported symbols</dt><dd>106 <span style="color:var(--muted)">(libc, libc++, liblog, the AMediaFormat NDK)</span></dd>
+      <dt>calls to dlopen/dlsym</dt><dd>none <span style="color:var(--muted)">(it is dlopen'd, it does not dlopen)</span></dd>
+      <dt>imports naming the interface</dt><dd>none</dd>
+      <dt>functions defined</dt><dd>840</dd>
+      <dt>call-graph edges</dt><dd>2 407</dd>
+      <dt>reachable from the export</dt><dd>1 function</dd>
+      <dt>reaching entries reported</dt><dd>0, for every ranked function</dd>
+    </dl>
+  </div>
+
+  <div class="col">
+    <p>One row in there deserves a word, because at first glance it contradicts the figure above. The figure shows <code>dlopen</code> and <code>dlsym</code>, and the table says this library calls neither of them. Both are true, because the framework is the one performing the <code>dlopen</code> and the <code>dlsym</code>, and the plugin is the <em>object</em> of those calls rather than the one making them. That carries a consequence which I had not properly appreciated until I wrote it out, namely that the named half of this whole relationship is recorded in the <em>framework's</em> binary, where the string <code>"GETEXTRACTORDEF"</code> and the call to <code>dlsym</code> actually sit. It is not recorded here at all. So an analyst holding only the plugin cannot tell which of its exports the framework is going to ask for, or even that one of them is special.</p>
+
+    <p>Two of those lines took me a while to accept. The export reaches exactly <em>one</em> function, because <code>GETEXTRACTORDEF</code> makes no calls at all, and so a forward walk from the only meaningful entry point covers exactly one node out of 840.</p>
+
+    <p>The other one is the missing interface import. I had gone looking for an imported base class, something like a vtable symbol for the framework's extractor interface, on the assumption that a plugin implementing an interface must depend on wherever that interface is defined. There is no such import. The reason is almost funny- <code>MediaExtractorPluginHelper</code> is a <strong>header-only</strong> C++ class, so it gets compiled <em>into</em> the plugin. That is why the recovered class owner for one of the vtable slots came back as <code>android::MediaExtractorPluginHelper</code> at a perfectly local address. The plugin has no link-time dependency on the interface whatsoever. The "interface" is a struct layout that both sides agreed on at compile time, plus one <code>dlsym</code>'d name.</p>
+
+    <p>So the call graph we build is not wrong, exactly, it is just a graph with an island in it.</p>
+  </div>
+
+  <figure>
+    <div class="figscroll">
+      <svg viewBox="0 0 720 280" role="img" aria-label="On the left a single isolated node labelled GETEXTRACTORDEF, the only function reachable from the export. On the right a dense cluster of several hundred function nodes containing the parser and the bug, with no path to the left-hand node. A dashed arrow bridges the gap, labelled as the real edge which appears in no symbol table and no call graph.">
+        <defs>
+          <marker id="g1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a2512a"/>
+          </marker>
+        </defs>
+
+        <text x="0" y="14" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.3" fill="currentColor" opacity="0.6">THE GRAPH WE ACTUALLY BUILD</text>
+
+        <circle cx="68" cy="140" r="13" fill="none" stroke="#2d5a86" stroke-width="2"/>
+        <text x="68" y="172" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#2d5a86">GETEXTRACTORDEF</text>
+        <text x="68" y="188" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="currentColor" opacity="0.6">the only export</text>
+        <text x="68" y="204" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="currentColor" opacity="0.6">reaches 1 node</text>
+
+        <g stroke="currentColor" stroke-width="1" opacity="0.28" fill="none">
+          <line x1="430" y1="60" x2="486" y2="92"/><line x1="486" y1="92" x2="552" y2="70"/>
+          <line x1="486" y1="92" x2="462" y2="148"/><line x1="462" y1="148" x2="534" y2="132"/>
+          <line x1="534" y1="132" x2="602" y2="104"/><line x1="552" y1="70" x2="614" y2="60"/>
+          <line x1="462" y1="148" x2="498" y2="198"/><line x1="498" y1="198" x2="572" y2="186"/>
+          <line x1="534" y1="132" x2="572" y2="186"/><line x1="602" y1="104" x2="658" y2="150"/>
+          <line x1="572" y1="186" x2="658" y2="150"/><line x1="498" y1="198" x2="440" y2="232"/>
+          <line x1="572" y1="186" x2="620" y2="226"/><line x1="658" y1="150" x2="694" y2="96"/>
+          <line x1="430" y1="60" x2="378" y2="104"/><line x1="378" y1="104" x2="462" y2="148"/>
+          <line x1="378" y1="104" x2="404" y2="170"/><line x1="404" y1="170" x2="498" y2="198"/>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75">
+          <circle cx="430" cy="60" r="7"/><circle cx="486" cy="92" r="7"/><circle cx="552" cy="70" r="7"/>
+          <circle cx="614" cy="60" r="7"/><circle cx="534" cy="132" r="7"/><circle cx="602" cy="104" r="7"/>
+          <circle cx="658" cy="150" r="7"/><circle cx="694" cy="96" r="7"/><circle cx="498" cy="198" r="7"/>
+          <circle cx="440" cy="232" r="7"/><circle cx="620" cy="226" r="7"/><circle cx="378" cy="104" r="7"/>
+          <circle cx="404" cy="170" r="7"/>
+        </g>
+        <circle cx="462" cy="148" r="9" fill="#a2512a" stroke="#a2512a" stroke-width="2"/>
+        <circle cx="572" cy="186" r="9" fill="none" stroke="#a2512a" stroke-width="2.4"/>
+        <text x="462" y="128" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#a2512a">parseChunk</text>
+        <text x="596" y="208" font-family="IBM Plex Mono, monospace" font-size="10" fill="#a2512a">read</text>
+
+        <text x="536" y="262" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">839 functions, 2 407 edges, no path from the export</text>
+
+        <path d="M 96 134 C 180 90, 260 86, 368 100" fill="none" stroke="#a2512a" stroke-width="1.8" stroke-dasharray="7 4" marker-end="url(#g1)"/>
+        <text x="232" y="66" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a2512a">the real edge</text>
+        <text x="232" y="81" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="#a2512a">in no table, in no graph</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">FIG 3</span> &mdash; This is what "zero reaching entries" looks like. The parsing code is all there, densely connected, and completely unreachable from the one export, because the edge that would connect them was never a call in the first place.</figcaption>
+  </figure>
+
+  <div class="aside col">
+    <p>I am going to steal this for teaching. It is a very clean exercise- give the class a small plugin and its host, ask them to draw the call graph from <code>readelf</code> and <code>objdump</code> alone, and then ask them to explain how the host ever runs the plugin's parser. The gap is discovered rather than announced, which is the way I like to introduce a topic. The usual lesson about "function pointers are hard for static analysis" never really lands, because everybody nods at it. Seeing an island in your own graph lands.</p>
+  </div>
+
+  <div class="col">
+    <h2>Four ways a function pointer breaks a call graph</h2>
+
+    <p>Once I had this straight, it was worth sorting the general case out, because function pointers do not break a call graph in one way. They break it in four, depending on which side of the boundary the pointer is <em>written</em> and which side it is <em>called</em>. The four cells need genuinely different machinery, and conflating them is how you end up building the wrong fix. I had been conflating two of them for years, honestly.</p>
+  </div>
+
+  <figure>
+    <div class="figscroll">
+      <svg viewBox="0 0 660 400" role="img" aria-label="A two by two grid. Rows are where the pointer is written, inside or outside the library. Columns are where it is called, inside or outside. Written inside and called inside is an interior gap, a missing edge. Written inside and called outside is an escaping pointer, a missing root, and is marked as the case discussed in the post. Written outside and called inside is an entering pointer, an attacker-controlled target. Written outside and called outside is invisible and not the analyst's problem.">
+        <text x="186" y="26" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1" fill="currentColor" opacity="0.65">CALLED INSIDE</text>
+        <text x="476" y="26" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1" fill="currentColor" opacity="0.65">CALLED OUTSIDE</text>
+        <text x="16" y="124" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1" fill="currentColor" opacity="0.65" transform="rotate(-90 16 124)" text-anchor="middle">WRITTEN INSIDE</text>
+        <text x="16" y="286" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1" fill="currentColor" opacity="0.65" transform="rotate(-90 16 286)" text-anchor="middle">WRITTEN OUTSIDE</text>
+
+        <rect x="44" y="44" width="284" height="160" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="64" y="74" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="currentColor">Interior</text>
+        <text x="64" y="100" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.8">A callback registered and</text>
+        <text x="64" y="117" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.8">dispatched in the same binary.</text>
+        <text x="64" y="146" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor">missing: an EDGE mid-chain</text>
+        <text x="64" y="176" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.6">Both ends are present, so the</text>
+        <text x="64" y="191" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.6">link is recoverable.</text>
+
+        <rect x="344" y="44" width="284" height="160" rx="2" fill="none" stroke="#a2512a" stroke-width="2.4"/>
+        <text x="364" y="74" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="#a2512a">Escaping</text>
+        <text x="364" y="100" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.8">Handed out through data, and</text>
+        <text x="364" y="117" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.8">called from another .so.</text>
+        <text x="364" y="146" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2512a">missing: a ROOT</text>
+        <text x="364" y="176" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#a2512a" opacity="0.85">No call site exists to attach an</text>
+        <text x="364" y="191" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#a2512a" opacity="0.85">edge to. This is our case.</text>
+
+        <rect x="44" y="216" width="284" height="160" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="64" y="246" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="currentColor">Entering</text>
+        <text x="64" y="272" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.8">Supplied from outside through</text>
+        <text x="64" y="289" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.8">an argument, dispatched here.</text>
+        <text x="64" y="318" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor">missing: the TARGET</text>
+        <text x="64" y="348" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.6">Not a reachability problem but</text>
+        <text x="64" y="363" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.6">a taint one.</text>
+
+        <rect x="344" y="216" width="284" height="160" rx="2" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="5 4" opacity="0.5"/>
+        <text x="364" y="246" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="currentColor" opacity="0.55">Elsewhere</text>
+        <text x="364" y="272" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.5">Never touches this binary.</text>
+        <text x="364" y="301" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity="0.5">missing: nothing we own</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">FIG 4</span> &mdash; Sorting the cases by where the pointer is written against where it is called. A virtual call whose concrete class cannot be recovered is a sub-case of the top-left cell: the edge exists, we just cannot say which of the candidates it goes to. The grid is not really about function pointers, as it turns out- it holds for any identity carried across a boundary, which the next section is about.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>Our existing machinery handled the top-left cell and handled it well. A function passes <code>&amp;callee</code> to a registrar, the registrar stores it into one struct field, a later call through that field dispatches to it, and we recover the edge. That is the classic callback case and it is the one everybody thinks of.</p>
+
+    <p>It could never have helped here, and it is worth being precise about why. First, it found zero such edges in this library. Second, and this is the part I had not thought through properly, even if it had found some, the backward search still has to <em>terminate at an export</em>, so adding edges to a graph whose only export makes no calls still gives you nothing. The fix for a missing root is not more edges.</p>
+
+    <h2>The names were never there to begin with</h2>
+
+    <p>One more thing fell out of this, and it is the part that I think generalises furthest beyond my particular problem.</p>
+
+    <p>Our whole reachability layer is keyed on function <em>names</em>. You ask it what reaches <code>parse</code> and it answers. So I went and checked what a name actually identifies in this library, and the answer is that it does not identify very much at all.</p>
+  </div>
+
+  <figure>
+    <div class="figscroll">
+      <svg viewBox="0 0 700 230" role="img" aria-label="A single name label, double underscore invoke, fans out with lines to eight distinct hexadecimal addresses, with a note that there are twenty four in total. Below, counts show that of 840 functions there are 477 distinct names, and 519 functions live under one of 156 colliding names.">
+        <rect x="0" y="86" width="150" height="46" rx="2" fill="none" stroke="#a2512a" stroke-width="2"/>
+        <text x="75" y="107" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" fill="#a2512a">__invoke</text>
+        <text x="75" y="123" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="currentColor" opacity="0.6">one name</text>
+
+        <g stroke="#a2512a" stroke-width="1" opacity="0.65">
+          <line x1="152" y1="104" x2="386" y2="22"/>
+          <line x1="152" y1="106" x2="386" y2="48"/>
+          <line x1="152" y1="108" x2="386" y2="74"/>
+          <line x1="152" y1="110" x2="386" y2="100"/>
+          <line x1="152" y1="112" x2="386" y2="126"/>
+          <line x1="152" y1="114" x2="386" y2="152"/>
+          <line x1="152" y1="116" x2="386" y2="178"/>
+          <line x1="152" y1="118" x2="386" y2="204"/>
+        </g>
+
+        <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="currentColor">
+          <text x="394" y="26">0014cbd0</text><text x="394" y="52">0014cc70</text>
+          <text x="394" y="78">0014cd00</text><text x="394" y="104">0014ce10</text>
+          <text x="394" y="130">0014ced0</text><text x="394" y="156">0014cf80</text>
+          <text x="394" y="182">0014d030</text><text x="394" y="208">0014d0e0</text>
+        </g>
+        <text x="492" y="130" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#a2512a">...24 of them in all</text>
+        <text x="492" y="146" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.6">24 distinct functions</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">FIG 5</span> &mdash; Of 840 functions, only 477 names are distinct, and 519 functions live under one of 156 colliding names. The worst offenders: <code>~Vector</code> appears 26 times, <code>__invoke</code> 24, <code>parse</code> 21, <code>attachTo</code> 13.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>When our tool says it found a route to <code>parse</code>, it has named 21 different functions at once. That is not a small imprecision, it is 62% of the library.</p>
+
+    <p>And here is the bit I found genuinely satisfying. Those 24 functions called <code>__invoke</code> are not badly named by accident. They are anonymous lambdas, and they were <em>never</em> given names, because the C++ that produced them never needed one.</p>
+
+    <p>I went and checked what the file itself carries, since the decompiler does print a long spelling for them. There is no <code>.symtab</code> and there are no debug sections, only a 192 entry <code>.dynsym</code>, and the text <code>__invoke</code> does not occur anywhere in the binary at all. So that long name is not being read out of any symbol the compiler left behind. What the file does carry is AOSP source paths and assertion text- <code>MPEG4Extractor.cpp:9273 CHECK(mBuffer != NULL) failed.</code> and 66 others like it- which is the <code>__PRETTY_FUNCTION__</code> material that the <code>CHECK</code> macros embed, and that is the only place in the whole file where such a signature exists. Meanwhile the record our own extractor writes for that address says plainly <code>name: "__invoke"</code>, the short form, and the short form is what the reachability layer then reads.</p>
+
+    <p>So the things handed across the library boundary have no usable names for the same reason that the handoff itself has no symbol- nobody ever had to say them out loud. An address is the only identity these functions have ever had.</p>
+
+    <p>Which settled an implementation argument we had been having. While discussing all of this with my co-engineer Claude-Opus, it proposed adding a qualified-name field to disambiguate, which is the obvious fix and would have worked for most of these cases. I had decided the other way on a related problem a while back- let the address decide, and keep names strictly for display. That decision had looked a little fussy even to me at the time. It is obviously right here, and for a reason I would not have found without going through everything above, because a qualified name is still only a name, and two template instantiations that the linker folds together will happily share one.</p>
+
+    <h2>This is not an Android problem</h2>
+
+    <p>It would be easy to file this under Android oddities, and that would be a mistake, because the shape is not Android's at all- it is how essentially every loadable plugin ABI works, wherein one symbol is resolved by name, that symbol hands back a table of addresses, and all the real traffic afterwards is unnamed.</p>
+
+    <ul>
+      <li>PAM modules- <code>pam_sm_authenticate</code> and friends, found by name, then driven through a struct.</li>
+      <li>NSS modules, nginx modules, Apache modules.</li>
+      <li>PostgreSQL extensions- <code>_PG_init</code>, then hooks installed by assignment to a global function pointer.</li>
+      <li>COM objects, and anything else that hands out an interface pointer.</li>
+      <li>Binder and HAL service stubs, where <code>onTransact</code> is reached through exactly this kind of indirection.</li>
+    </ul>
+
+    <p>In every one of those, an analyst who reads the import and export tables and then builds a call graph will get an island. The plugin is a library whose whole purpose is to be called by code it cannot name, using a protocol that is a struct layout rather than a set of symbols. I had been treating "it uses function pointers" as a nuisance to work around. It is closer to the point of the design.</p>
+
+    <p>So the practical lesson I am taking away is narrow but useful- when the call graph has an island, stop looking for a call you missed and go looking for a store. The instruction that hands the address out is the edge.</p>
+
+    <h2>I had built one of these myself</h2>
+
+    <p>When I had all of the above straight, something kept nagging at me, and after a while I remembered what it was. I had built exactly this channel myself, years ago, in VUzzer.</p>
+
+    <p>VUzzer fuzzes using basic-block weights that are computed statically, and a basic-block address only means something relative to the load base of the library it sits in. The Pin tool and the Python driver are separate programs in separate processes, so that load offset had to travel from the one to the other somehow. What I did was this:</p>
+
+    <pre><code><span class="cmt">/* bbcounts2.cpp - the Pin tool, running inside the target's process */</span>
+#define FILEPATH "image.offset"
+ioffset   = open(FILEPATH, O_RDWR);
+offsetmap = (char*)mmap(0, 18, PROT_READ | PROT_WRITE, MAP_SHARED, ioffset, 0);
+<span class="cmt">/* ... then in the ImageLoad callback, for a watched library: */</span>
+std::memcpy(offsetmap, StringFromAddrint(IMG_LoadOffset(img)).c_str(), 18);</code></pre>
+
+    <pre><code><span class="cmt"># runfuzzer.py - the driver, a different process altogether</span>
+libfd    = open("image.offset","r+b")
+libfd_mm = mmap.mmap(libfd.fileno(),0)
+<span class="cmt"># ... and per run:</span>
+liboffsetcur = int(libfd_mm[:18],0)</code></pre>
+
+    <p>The address crosses as an 18 character ASCII hex string, which is <code>0x</code> plus sixteen digits, through a shared mapping of a file on disk. There is no symbol involved anywhere, and the entire protocol is the two numbers 18 and 0, agreed between two source files that never mention one another. Analyse the Pin tool on its own and you see a write into a mapping. Analyse the Python on its own and you see a read of a file. Nothing connects the two, which is the island again, this time with a process boundary in place of a library boundary.</p>
+
+  </div>
+
+  <figure>
+    <div class="figscroll">
+      <svg viewBox="0 0 720 272" role="img" aria-label="A diagram of the VUzzer channel. On the left, the Pin tool running inside the target process memcpys the image load offset as eighteen bytes into a shared file mapping called image.offset, drawn straddling the process boundary. On the right, the Python fuzzer process reads the same eighteen bytes back and parses them. A note records that no call happens anywhere: the number is a frame of reference, and a mismatch against the expected base aborts the run.">
+        <defs>
+          <marker id="vz" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a2512a"/>
+          </marker>
+        </defs>
+
+        <line x1="360" y1="22" x2="360" y2="48" stroke="currentColor" stroke-width="1" opacity="0.3" stroke-dasharray="3 5"/>
+        <line x1="360" y1="110" x2="360" y2="200" stroke="currentColor" stroke-width="1" opacity="0.3" stroke-dasharray="3 5"/>
+        <text x="360" y="216" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.5">process boundary</text>
+
+        <rect x="266" y="52" width="188" height="54" rx="2" fill="none" stroke="#a2512a" stroke-width="1.8" stroke-dasharray="5 3"/>
+        <text x="360" y="75" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" fill="#a2512a">image.offset</text>
+        <text x="360" y="92" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#a2512a" opacity="0.85">18 bytes, ASCII hex</text>
+
+        <rect x="0" y="150" width="184" height="56" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="92" y="173" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="500" fill="currentColor">Pin tool</text>
+        <text x="92" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">in the target process</text>
+
+        <rect x="536" y="150" width="184" height="56" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="628" y="173" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="500" fill="currentColor">Python driver</text>
+        <text x="628" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">the fuzzer process</text>
+
+        <line x1="188" y1="158" x2="264" y2="102" stroke="#a2512a" stroke-width="1.5" marker-end="url(#vz)"/>
+        <text x="190" y="124" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a2512a">memcpy(&#8230;, 18)</text>
+
+        <line x1="456" y1="102" x2="532" y2="158" stroke="#a2512a" stroke-width="1.5" marker-end="url(#vz)"/>
+        <text x="530" y="124" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#a2512a">int(mm[:18], 0)</text>
+
+        <text x="0" y="246" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity="0.75">No call anywhere. The number is a frame of reference, not a target:</text>
+        <text x="0" y="264" font-family="IBM Plex Mono, monospace" font-size="11" fill="#a2512a">offset != expected base  &#8594;  die("load address changed..run again!")</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">FIG 6</span> &mdash; The same trick as Figure 1, across a process boundary instead of a library one, and with the address used as a datum rather than as code. Compare the two: there the receiver calls what it is handed, here it checks it and aborts if the ground has moved underneath the static analysis.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>So yes, the shape is the same. But the place where the analogy stops is the part I find genuinely instructive, because the Python never calls that address. It compares it:</p>
+
+    <pre><code>if liboffsetcur != int(config.LIBOFFSETS[1],0):
+    gau.die("load address changed..run again!")</code></pre>
+
+    <p>The address is not a call target at all, it is a <em>frame of reference</em>. The weights were computed against one load base, so if ASLR has moved the library then every basic-block address in the table is meaningless, and the honest thing to do is to refuse the run. Which means the two cases break an analysis in quite different ways- in the plugin, a missing address costs you a control-flow edge, whereas here it would cost you the correspondence between a static address space and a running one.</p>
+
+    <p>And that is the naming lesson arriving from the other side. An address is an identity only relative to a base, and we had to learn it again in our own crash attribution work, wherein a sanitizer report hands you a module and an offset and that has to be mapped back to a link-time address before it names any function at all. I had already solved that once with an 18 byte file and a <code>die()</code>, and then met it again from the opposite end, as the person trying to recover somebody else's channel rather than the person building his own.</p>
+
+    <p>So the family is wider than function pointers. It is any channel that carries an identity across a boundary that nothing resolves- a shared mapping, shared memory, a pipe or a socket, an environment variable, <code>/proc</code>, a config file naming a symbol, a serialised callback id, an RPC handle. Every one of them creates a coupling which is real, load bearing, and in no table.</p>
+
+    <p class="pull">The analyst's difficulty is the implementer's convenience.</p>
+
+    <p class="signoff">So, I would say &ldquo;follow the stores, not the calls&rdquo;.</p>
+    <p class="byline">- Sanjay Rawat</p>
+  </div>
+</div>
+</body>
+</html>
