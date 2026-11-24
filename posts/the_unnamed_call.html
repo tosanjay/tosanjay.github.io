@@ -152,6 +152,24 @@
     padding-top: 1.75rem; border-top: 1px solid var(--rule);
   }
   .byline { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); margin-top: 1.5rem; }
+  /* --- phone: let each diagram keep a legible scale and pan inside its own scroller,
+         instead of shrinking its 10px labels to 5px --- */
+  @media (max-width: 760px) {
+    figure svg { min-width: 700px; }
+    .figscroll { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+    figcaption::before {
+      content: "\2194 scroll the diagram to read it";
+      display: block; font-family: var(--font-mono); font-size: 0.72rem;
+      letter-spacing: 0.02em; color: var(--unnamed); margin-bottom: 0.45rem;
+    }
+    pre { font-size: 0.74rem; padding: 0.85rem 0.9rem; }
+  }
+  @media (max-width: 560px) {
+    .facts { padding: 1rem 1.05rem; }
+    .facts dl { grid-template-columns: 1fr; gap: 0.1rem; }
+    .facts dt { margin-top: 0.55rem; }
+    .facts dd { padding-bottom: 0.1rem; }
+  }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
